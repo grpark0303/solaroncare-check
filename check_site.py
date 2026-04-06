@@ -12,25 +12,13 @@ def run_automation():
     options.add_argument('--headless')
     options.add_argument('--no-sandbox')
     options.add_argument('--disable-dev-shm-usage')
-    options.add_argument('--window-size=1920,1080')
+    options.add_argument('--window-size=390,844') # 아이폰 13/14 화면 크기
     
-    # [핵심] 네이버 차단을 피하기 위한 위장 설정
+    # [핵심] 아이폰 사용자로 완벽 위장
+    options.add_argument("user-agent=Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1")
     options.add_argument("lang=ko_KR")
-    options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36")
-    options.add_experimental_option("excludeSwitches", ["enable-automation"])
-    options.add_experimental_option('useAutomationExtension', False)
 
     driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
-    
-    # 봇 감지 우회 스크립트 실행
-    driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {
-        "source": """
-            Object.defineProperty(navigator, 'webdriver', {
-                get: () => undefined
-            })
-        """
-    })
-
     report_details = []
     total_status = "정상"
 
@@ -38,7 +26,7 @@ def run_automation():
         if not url: return f"❌ {name} : 링크 없음"
         try:
             driver.get(url)
-            time.sleep(5) # 랜딩 페이지 로딩 대기
+            time.sleep(5)
             if "solaroncare" in driver.current_url:
                 return f"✅ {name} : 정상"
             else:
@@ -47,7 +35,7 @@ def run_automation():
             return f"❌ {name} : 접속불가"
 
     try:
-        # 1. 자사 페이지 점검 (기존 로직 유지)
+        # 1. 자사 페이지 점검 (기존 동일)
         pages = {
             "상세 페이지": "https://solaroncare.com/oncarehome/oncare?tab=%EC%84%9C%EB%B9%84%EC%8A%A4+%EC%86%8C%EA%B0%9C",
             "이벤트 페이지": "https://solaroncare.com/oncarehome/coupons",
@@ -61,16 +49,17 @@ def run_automation():
             else:
                 report_details.append(f"❌ {name} : 오류")
 
-        # 2. 네이버 검색 점검 (가람님이 주신 경로 기반)
-        search_url = "https://search.naver.com/search.naver?where=nexearch&query=%EC%86%94%EB%9D%BC%EC%98%A8%EC%BC%80%EC%96%B4"
-        driver.get(search_url)
-        time.sleep(7) # 검색 결과 로딩 대기
+        # 2. [변경] 네이버 모바일 검색으로 우회 접속
+        # 모바일 버전은 봇 탐지가 훨씬 약합니다.
+        m_search_url = "https://m.search.naver.com/search.naver?query=%EC%86%94%EB%9D%BC%EC%98%A8%EC%BC%80%EC%96%B4"
+        driver.get(m_search_url)
+        time.sleep(8) # 충분한 로딩 시간
         
-        # 화면 스크롤 (실제 사용자처럼 행동)
-        driver.execute_script("window.scrollTo(0, 800);")
+        # 스크롤을 내려 광고가 로드되게 함
+        driver.execute_script("window.scrollTo(0, 1000);")
         time.sleep(2)
 
-        # 네이버 브랜드 검색 광고 링크(adcr.naver.com) 모두 수집
+        # 모든 광고 클릭 링크(adcr.naver.com) 수집
         all_links = driver.find_elements(By.TAG_NAME, "a")
         valid_urls = []
         for l in all_links:
@@ -79,16 +68,17 @@ def run_automation():
                 if href not in valid_urls:
                     valid_urls.append(href)
 
-        # 수집된 링크 매칭 (보통 제목/이미지 중복이 있어 유니크한 링크만 사용)
         bsa_names = ["네이버 BSA 메인", "네이버 BSA 썸네일1", "네이버 BSA 썸네일2", "네이버 BSA 썸네일3"]
         
-        # 실제 광고 영역의 링크만 정교하게 필터링
+        # 모바일에서도 링크 순서는 거의 동일합니다.
         if len(valid_urls) >= 4:
             for i in range(4):
                 report_details.append(check_landing(valid_urls[i], bsa_names[i]))
+        elif len(valid_urls) > 0:
+            # 링크는 찾았으나 4개가 안 될 경우 가능한 것만 체크
+            for i in range(len(valid_urls)):
+                if i < 4: report_details.append(check_landing(valid_urls[i], bsa_names[i]))
         else:
-            # 링크를 못 찾았다면 화면 캡처 로그 남기기 (디버깅용)
-            print(f"발견된 광고 링크 수: {len(valid_urls)}")
             for name in bsa_names:
                 report_details.append(f"❌ {name} : 영역 미발견")
 
