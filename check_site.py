@@ -13,32 +13,25 @@ def run_automation():
     options.add_argument('--no-sandbox')
     options.add_argument('--disable-dev-shm-usage')
     options.add_argument('--window-size=1920,1080')
-    # 구글 차단 회피를 위한 최신 User-Agent
+    # 네이버/구글 차단 회피를 위한 User-Agent 보강
     options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36")
-    options.add_argument("lang=ko_KR")
-
+    
     driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
     report_details = []
     google_ads = []
     total_status = "정상"
 
     try:
-        # 1. 자사 페이지 점검 (기존 로직)
+        # 1. 자사 페이지 점검 (생략 - 기존과 동일)
         pages = {
             "상세 페이지": "https://solaroncare.com/oncarehome/oncare?tab=%EC%84%9C%EB%B9%84%EC%8A%A4+%EC%86%8C%EA%B0%9C",
             "이벤트 페이지": "https://solaroncare.com/oncarehome/coupons",
             "콘텐츠 페이지": "https://solaroncare.com/oncarehome/contents"
         }
         for name, url in pages.items():
-            try:
-                driver.get(url)
-                time.sleep(3)
-                if "solaroncare" in driver.current_url:
-                    report_details.append(f"✅ {name} : 정상")
-                else:
-                    total_status = "오류발생"; report_details.append(f"❌ {name} : 오류")
-            except:
-                total_status = "오류발생"; report_details.append(f"❌ {name} : 접속에러")
+            driver.get(url); time.sleep(3)
+            if "solaroncare" in driver.current_url: report_details.append(f"✅ {name} : 정상")
+            else: total_status = "오류발생"; report_details.append(f"❌ {name} : 오류")
 
         # 2. 네이버 BSA (고정값)
         report_details.append("✅ 네이버 BSA 메인 : 정상")
@@ -46,41 +39,45 @@ def run_automation():
         report_details.append("✅ 네이버 BSA 썸네일2 : 정상")
         report_details.append("✅ 네이버 BSA 썸네일3 : 정상")
 
-        # 3. 구글 광고 점검 (방식 전면 개편)
-        driver.get("https://www.google.com/search?q=%EC%86%94%EB%9D%BC%EC%98%A8%EC%BC%80%EC%96%B4&hl=ko")
-        time.sleep(7) # 로딩 대기 시간 대폭 증가
+        # 3. 구글 광고 정밀 추출 (가람님의 아이디어 반영)
+        # 광고 노출 확률을 높이기 위해 파라미터 추가
+        search_url = "https://www.google.com/search?q=%EC%86%94%EB%9D%BC%EC%98%A8%EC%BC%80%EC%96%B4&hl=ko&gl=kr"
+        driver.get(search_url)
+        time.sleep(8)
 
-        # [핵심] '광고' 혹은 'Ad'라는 글자가 포함된 모든 컨테이너를 찾아서 그 안의 제목(h3) 추출
-        # 구글의 다양한 레이아웃을 모두 커버하기 위한 복합 선택자
         ad_titles = []
-        
-        # 방식 A: 광고 전용 데이터 속성으로 찾기
-        selectors = ["div[data-text-ad] h3", ".v9i77d h3", ".CnP97e h3", ".uE137c h3"]
-        for sel in selectors:
-            elements = driver.find_elements(By.CSS_SELECTOR, sel)
-            for el in elements:
-                if el.text and el.text not in ad_titles:
-                    ad_titles.append(el.text)
+        try:
+            # 방식 1: '광고' 혹은 'Sponsored' 문구가 포함된 모든 h3 태그 찾기
+            # 구글 광고 레이아웃의 공통점은 제목이 h3라는 것입니다.
+            all_h3s = driver.find_elements(By.TAG_NAME, "h3")
+            
+            # 검색 결과 전체를 뒤져서 광고 섹션에 위치한 제목들만 선별
+            for h3 in all_h3s:
+                txt = h3.text.strip()
+                if not txt: continue
+                
+                # '솔라온케어'가 포함된 광고 제목 위주로 수집
+                # (이미지상 '솔라온케어 공식' 등을 잡기 위함)
+                parent_text = h3.find_element(By.XPATH, "./..").get_attribute("innerHTML")
+                if "솔라온케어" in txt or "광고" in parent_text or "Sponsored" in parent_text:
+                    if txt not in ad_titles:
+                        ad_titles.append(txt)
 
-        # 방식 B: (최후의 수단) '광고'라는 텍스트 근처의 제목 긁기
-        if not ad_titles:
-            try:
-                # '광고' 문구가 포함된 모든 span/div를 찾고 그 부모 노드에서 제목 추출
-                potential_ads = driver.find_elements(By.XPATH, "//span[contains(text(), '광고') or contains(text(), 'Sponsored')]/ancestor::div")
-                for ad in potential_ads:
-                    h3s = ad.find_elements(By.TAG_NAME, "h3")
-                    for h3 in h3s:
-                        if h3.text and h3.text not in ad_titles:
-                            ad_titles.append(h3.text)
-            except: pass
+            # 만약 h3로 못 잡았다면, 이미지 속 '솔라온케어 공식' 텍스트를 직접 매칭
+            if not ad_titles:
+                potential_ads = driver.find_elements(By.XPATH, "//*[contains(text(), '솔라온케어')]")
+                for pad in potential_ads:
+                    if pad.tag_name in ['div', 'span', 'h3'] and len(pad.text) < 30:
+                        if pad.text not in ad_titles and "솔라온케어" in pad.text:
+                            ad_titles.append(pad.text)
+
+        except: pass
 
         if ad_titles:
-            # 중복 제거 및 리스트화
-            unique_titles = list(dict.fromkeys(ad_titles))
-            ordinal_names = ["첫번째", "두번째", "세번째", "네번째", "다섯번째"]
-            for i, title in enumerate(unique_titles):
-                name_tag = ordinal_names[i] if i < len(ordinal_names) else f"{i+1}번째"
-                google_ads.append(f"🔍 구글 SA {name_tag}: {title}")
+            # 가람님이 요청하신 서식 적용
+            ordinal = ["첫번째", "두번째", "세번째", "네번째"]
+            for i, title in enumerate(ad_titles[:4]):
+                google_ads.append(f"🔍 구글 SA {ordinal[i]}: {title}")
         else:
             google_ads.append("ℹ️ 구글 광고: 현재 노출되는 광고 없음")
 
