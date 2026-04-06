@@ -19,64 +19,84 @@ def run_automation():
     total_status = "정상"
 
     try:
-        # --- 자사 페이지 체크 ---
-        check_urls = {
-            "상세페이지": "https://solaroncare.com/oncarehome/oncare?tab=%EC%84%9C%EB%B9%84%EC%8A%A4+%EC%86%8C%EA%B0%9C",
-            "이벤트페이지": "https://solaroncare.com/oncarehome/coupons",
-            "콘텐츠페이지": "https://solaroncare.com/oncarehome/contents"
+        # 1. 자사 페이지 체크 (문구 수정 반영)
+        pages = {
+            "상세 페이지": "https://solaroncare.com/oncarehome/oncare?tab=%EC%84%9C%EB%B9%84%EC%8A%A4+%EC%86%8C%EA%B0%9C",
+            "이벤트 페이지": "https://solaroncare.com/oncarehome/coupons",
+            "콘텐츠 페이지": "https://solaroncare.com/oncarehome/contents"
         }
         
-        for name, url in check_urls.items():
+        for name, url in pages.items():
             try:
                 driver.get(url)
                 time.sleep(3)
                 if "solaroncare" in driver.current_url:
-                    report_details.append(f"✅ {name}: OK")
+                    report_details.append(f"✅ {name}: 정상")
                 else:
-                    total_status = "오류"
-                    report_details.append(f"❌ {name}: 실패")
+                    total_status = "오류발생"
+                    report_details.append(f"❌ {name}: 오류")
             except:
-                total_status = "오류"
-                report_details.append(f"❌ {name}: 에러")
+                total_status = "오류발생"
+                report_details.append(f"❌ {name}: 접속에러")
 
-        # --- 네이버 브랜드검색 체크 ---
+        # 2. 네이버 브랜드 검색(BSA) 정밀 체크
         driver.get("https://search.naver.com/search.naver?query=%EC%86%94%EB%9D%BC%EC%98%A8%EC%BC%80%EC%96%B4")
-        time.sleep(3)
+        time.sleep(4)
+
         try:
-            brand_section = driver.find_element(By.CSS_SELECTOR, ".ad_section")
-            report_details.append("✅ 네이버 검색 노출 확인")
+            # 브랜드 검색 영역 찾기
+            bsa_area = driver.find_element(By.CSS_SELECTOR, ".ad_section")
+            
+            # 메인 영역 및 썸네일 링크들 수집
+            links = bsa_area.find_elements(By.TAG_NAME, "a")
+            
+            # 중복 제거 및 유효한 링크 필터링 (네이버 내부 링크 제외)
+            target_links = []
+            for l in links:
+                href = l.get_attribute('href')
+                if href and "naver.com" not in href and href not in target_links:
+                    target_links.append(href)
+
+            # 영역별 이름 매칭 (순서대로 메인, 썸네일1, 2, 3)
+            bsa_names = ["네이버 BSA 메인", "네이버 BSA 썸네일1", "네이버 BSA 썸네일2", "네이버 BSA 썸네일3"]
+            
+            for i, name in enumerate(bsa_names):
+                if i < len(target_links):
+                    # 해당 링크로 이동해서 랜딩 페이지 확인
+                    driver.get(target_links[i])
+                    time.sleep(2)
+                    if "solaroncare" in driver.current_url:
+                        report_details.append(f"✅ {name} : 정상")
+                    else:
+                        total_status = "오류발생"
+                        report_details.append(f"❌ {name} : 연결실패")
+                else:
+                    total_status = "오류발생"
+                    report_details.append(f"❌ {name} : 영역찾기실패")
         except:
-            total_status = "오류"
-            report_details.append("❌ 네이버 검색 미노출")
+            total_status = "오류발생"
+            report_details.append("❌ 네이버 BSA 영역 로드 실패")
 
     except Exception as e:
-        total_status = "에러"
-        report_details.append(f"⚠️ 시스템에러: {str(e)}")
+        total_status = "시스템에러"
+        report_details.append(f"⚠️ 에러: {str(e)}")
     finally:
         driver.quit()
         send_to_google_form(total_status, "\n".join(report_details))
 
 def send_to_google_form(status, detail):
-    # [수정] 가람님 설문지 ID와 주소 재검증 완료
-    # 공백이나 특수문자 오류 방지를 위해 f-string 대신 직접 입력
     form_url = "https://docs.google.com/forms/d/e/1FAIpQLSdF9Q5waHP_dlPK35TonomQxbqph6SIYAoNa9FgXxjd8AJstw/formResponse"
-    
     payload = {
         "entry.1608092729": datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
         "entry.1702029548": status,
         "entry.1759228838": detail
     }
-    
-    print(f">>> 전송 시도 주소: {form_url}")
     try:
         res = requests.post(form_url, data=payload, timeout=10)
         if res.status_code == 200:
-            print(">>> [성공] 구글 시트 업데이트 완료!")
-        else:
-            print(f">>> [실패] 상태코드: {res.status_code}")
-            # 404가 계속 뜬다면 구글 설문지의 ID(주소 중간값)가 정확하지 않은 것입니다.
-    except Exception as e:
-        print(f">>> [에러] 네트워크 문제: {e}")
+            print(">>> 전송 성공!")
+    except:
+        print(">>> 전송 실패")
 
 if __name__ == "__main__":
     run_automation()
