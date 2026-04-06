@@ -18,64 +18,61 @@ def run_automation():
     report_details = []
     total_status = "정상"
 
+    def check_landing(url, name):
+        if not url:
+            return f"❌ {name} : 링크 없음"
+        try:
+            driver.get(url)
+            time.sleep(2)
+            if "solaroncare" in driver.current_url:
+                return f"✅ {name} : 정상"
+            else:
+                return f"❌ {name} : 연결실패(URL확인필요)"
+        except:
+            return f"❌ {name} : 접속에러"
+
     try:
-        # 1. 자사 페이지 체크 (문구 수정 반영)
+        # 1. 자사 페이지 체크
         pages = {
             "상세 페이지": "https://solaroncare.com/oncarehome/oncare?tab=%EC%84%9C%EB%B9%84%EC%8A%A4+%EC%86%8C%EA%B0%9C",
             "이벤트 페이지": "https://solaroncare.com/oncarehome/coupons",
             "콘텐츠 페이지": "https://solaroncare.com/oncarehome/contents"
         }
-        
         for name, url in pages.items():
-            try:
-                driver.get(url)
-                time.sleep(3)
-                if "solaroncare" in driver.current_url:
-                    report_details.append(f"✅ {name}: 정상")
-                else:
-                    total_status = "오류발생"
-                    report_details.append(f"❌ {name}: 오류")
-            except:
-                total_status = "오류발생"
-                report_details.append(f"❌ {name}: 접속에러")
+            res = check_landing(url, name)
+            report_details.append(res)
+            if "❌" in res: total_status = "오류발생"
 
-        # 2. 네이버 브랜드 검색(BSA) 정밀 체크
+        # 2. 네이버 브랜드 검색(BSA) 정밀 체크 (빨간 네모 4구역)
         driver.get("https://search.naver.com/search.naver?query=%EC%86%94%EB%9D%BC%EC%98%A8%EC%BC%80%EC%96%B4")
-        time.sleep(4)
+        time.sleep(5)
 
         try:
-            # 브랜드 검색 영역 찾기
-            bsa_area = driver.find_element(By.CSS_SELECTOR, ".ad_section")
+            # 브랜드검색 최상위 컨테이너 찾기
+            bsa_container = driver.find_element(By.CSS_SELECTOR, ".ad_section, .brand_search")
             
-            # 메인 영역 및 썸네일 링크들 수집
-            links = bsa_area.find_elements(By.TAG_NAME, "a")
-            
-            # 중복 제거 및 유효한 링크 필터링 (네이버 내부 링크 제외)
-            target_links = []
-            for l in links:
-                href = l.get_attribute('href')
-                if href and "naver.com" not in href and href not in target_links:
-                    target_links.append(href)
+            # [메인 영역] - 보통 큰 이미지나 제목 링크
+            main_link = bsa_container.find_element(By.CSS_SELECTOR, ".ad_info_area a, .title_area a").get_attribute('href')
+            report_details.append(check_landing(main_link, "네이버 BSA 메인"))
 
-            # 영역별 이름 매칭 (순서대로 메인, 썸네일1, 2, 3)
-            bsa_names = ["네이버 BSA 메인", "네이버 BSA 썸네일1", "네이버 BSA 썸네일2", "네이버 BSA 썸네일3"]
+            # [썸네일 영역] - 하단 3개 이미지
+            # 네이버 BSA 구조상 썸네일은 보통 특정 클래스 내의 리스트 형태입니다.
+            thumbnails = bsa_container.find_elements(By.CSS_SELECTOR, ".thumb_area a, .list_thumb a")
             
-            for i, name in enumerate(bsa_names):
-                if i < len(target_links):
-                    # 해당 링크로 이동해서 랜딩 페이지 확인
-                    driver.get(target_links[i])
-                    time.sleep(2)
-                    if "solaroncare" in driver.current_url:
-                        report_details.append(f"✅ {name} : 정상")
-                    else:
-                        total_status = "오류발생"
-                        report_details.append(f"❌ {name} : 연결실패")
+            for i in range(3): # 썸네일 1, 2, 3 순서대로
+                name = f"네이버 BSA 썸네일{i+1}"
+                if i < len(thumbnails):
+                    thumb_link = thumbnails[i].get_attribute('href')
+                    res = check_landing(thumb_link, name)
+                    report_details.append(res)
                 else:
-                    total_status = "오류발생"
-                    report_details.append(f"❌ {name} : 영역찾기실패")
-        except:
+                    report_details.append(f"❌ {name} : 영역 미발견")
+            
+            if any("❌" in r for r in report_details): total_status = "오류발생"
+
+        except Exception as e:
             total_status = "오류발생"
-            report_details.append("❌ 네이버 BSA 영역 로드 실패")
+            report_details.append(f"❌ 네이버 BSA 구조 인식 실패 (사유: {str(e)[:30]})")
 
     except Exception as e:
         total_status = "시스템에러"
@@ -91,12 +88,7 @@ def send_to_google_form(status, detail):
         "entry.1702029548": status,
         "entry.1759228838": detail
     }
-    try:
-        res = requests.post(form_url, data=payload, timeout=10)
-        if res.status_code == 200:
-            print(">>> 전송 성공!")
-    except:
-        print(">>> 전송 실패")
+    requests.post(form_url, data=payload, timeout=10)
 
 if __name__ == "__main__":
     run_automation()
