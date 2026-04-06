@@ -1,0 +1,19 @@
+name: Daily Site Check
+on:
+  schedule:
+    - cron: '0 22 * * *' # 한국시간 오전 7시 (UTC 22:00)
+  workflow_dispatch: # 수동 실행 버튼 활성화
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+      - name: Run script
+        run: python check_site.py
