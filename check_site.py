@@ -1,6 +1,7 @@
 import requests
 import datetime
 import time
+import os
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
@@ -14,11 +15,13 @@ def run_automation():
     options.add_argument('--headless')
     options.add_argument('--no-sandbox')
     options.add_argument('--disable-dev-shm-usage')
-    options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36")
+    # 한국 사용자처럼 보이게 설정 보강
+    options.add_argument('--window-size=1920,1080')
+    options.add_argument('--lang=ko_KR')
+    options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36")
     
     driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
-    # 봇이 요소를 찾을 때까지 기다려주는 '대기조' 설정
-    wait = WebDriverWait(driver, 15) 
+    wait = WebDriverWait(driver, 20) # 대기 시간을 20초로 더 늘림
     
     report_details = []
     total_status = "정상"
@@ -27,7 +30,7 @@ def run_automation():
         if not url: return f"❌ {name} : 링크 없음"
         try:
             driver.get(url)
-            time.sleep(3)
+            time.sleep(4) # 랜딩 페이지 로딩 대기 강화
             if "solaroncare" in driver.current_url:
                 return f"✅ {name} : 정상"
             else:
@@ -36,7 +39,7 @@ def run_automation():
             return f"❌ {name} : 접속에러"
 
     try:
-        # 1. 자사 페이지 체크 (이 부분은 잘 되니 그대로 둡니다)
+        # 1. 자사 페이지 체크
         pages = {
             "상세 페이지": "https://solaroncare.com/oncarehome/oncare?tab=%EC%84%9C%EB%B9%84%EC%8A%A4+%EC%86%8C%EA%B0%9C",
             "이벤트 페이지": "https://solaroncare.com/oncarehome/coupons",
@@ -48,42 +51,67 @@ def run_automation():
             if "❌" in res: total_status = "오류발생"
 
         # 2. 네이버 브랜드 검색 정밀 체크
-        driver.get("https://search.naver.com/search.naver?query=%EC%86%94%EB%9D%BC%EC%98%A8%EC%BC%80%EC%96%B4")
-        
+        search_url = "https://search.naver.com/search.naver?where=nexearch&query=%EC%86%94%EB%9D%BC%EC%98%A8%EC%BC%80%EC%96%B4"
+        driver.get(search_url)
+        time.sleep(5) # 검색 결과 로딩 대기
+
         try:
-            # 광고 영역이 나타날 때까지 최대 15초 대기 (가장 확실한 선택자 사용)
-            bsa_container = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "div.ad_section, section.sc_new.sp_nbrand")))
-            time.sleep(2) # 로딩 후 안정화를 위해 2초 더 대기
-
-            # [메인 영역] - 링크 찾기
-            main_link = bsa_container.find_element(By.CSS_SELECTOR, "a.ad_thumb, a.title_link, a.info_title").get_attribute('href')
-            report_details.append(check_landing(main_link, "네이버 BSA 메인"))
-
-            # [썸네일 영역] - 하단 3개 리스트 찾기
-            # 네이버 모바일/PC 버전에 따라 클래스가 다를 수 있어 여러 경로 시도
-            thumbnails = bsa_container.find_elements(By.CSS_SELECTOR, ".thumb_area a, .list_thumb a, .lnk_item")
+            # 네이버 BSA를 찾는 가장 강력한 방법: 'brand_search'나 'ad_section' 키워드 포함 요소 탐색
+            # 여러 개의 선택자를 시도합니다.
+            selectors = [
+                "div.ad_section", 
+                "section.sc_new.sp_nbrand", 
+                "div.brand_search",
+                "div.ns_bsa"
+            ]
             
-            # 실제 썸네일 링크만 필터링 (중복 제거)
-            final_thumbs = []
-            for t in thumbnails:
-                href = t.get_attribute('href')
-                if href and "naver.com" not in href and href not in final_thumbs:
-                    final_thumbs.append(href)
+            bsa_container = None
+            for selector in selectors:
+                try:
+                    bsa_container = driver.find_element(By.CSS_SELECTOR, selector)
+                    if bsa_container.is_displayed():
+                        break
+                except:
+                    continue
 
-            for i in range(3):
-                name = f"네이버 BSA 썸네일{i+1}"
-                if i < len(final_thumbs):
-                    report_details.append(check_landing(final_thumbs[i], name))
-                else:
-                    report_details.append(f"❌ {name} : 영역 미발견")
+            if bsa_container:
+                # 1) 메인 링크 추출
+                main_selectors = ["a.ad_thumb", "a.title_link", "a.info_title", "div.ad_info_area a"]
+                main_link = None
+                for ms in main_selectors:
+                    try:
+                        main_link = bsa_container.find_element(By.CSS_SELECTOR, ms).get_attribute('href')
+                        if main_link: break
+                    except: continue
+                
+                report_details.append(check_landing(main_link, "네이버 BSA 메인"))
+
+                # 2) 썸네일 링크들 추출
+                thumb_elements = bsa_container.find_elements(By.CSS_SELECTOR, "div.thumb_area a, ul.list_thumb a, a.lnk_item")
+                
+                final_thumbs = []
+                for t in thumb_elements:
+                    href = t.get_attribute('href')
+                    if href and "naver.com" not in href and href not in final_thumbs:
+                        final_thumbs.append(href)
+
+                for i in range(3):
+                    name = f"네이버 BSA 썸네일{i+1}"
+                    if i < len(final_thumbs):
+                        report_details.append(check_landing(final_thumbs[i], name))
+                    else:
+                        report_details.append(f"❌ {name} : 영역 미발견")
+            else:
+                total_status = "오류발생"
+                report_details.append("❌ 네이버 BSA 영역 로딩 실패 (미노출)")
 
         except Exception as e:
             total_status = "오류발생"
-            report_details.append(f"❌ 네이버 BSA 로딩 실패 (시간 초과)")
+            report_details.append(f"❌ 네이버 BSA 체크 중 에러")
 
     except Exception as e:
         total_status = "시스템에러"
-        report_details.append(f"⚠️ 에러: {str(e)[:50]}")
+        report_details.append(f"⚠️ 에러: {str(e)[:40]}")
     finally:
         driver.quit()
         if any("❌" in r for r in report_details): total_status = "오류발생"
