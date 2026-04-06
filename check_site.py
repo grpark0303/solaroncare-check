@@ -17,48 +17,68 @@ def run_automation():
     
     driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
     report_details = []
+    google_ads = [] # 구글 광고 결과를 따로 담아두기 위해
     total_status = "정상"
 
     try:
-        # 1. 자사 페이지 점검 (기존 동일)
+        # 1. 자사 페이지 점검
         pages = {
             "상세 페이지": "https://solaroncare.com/oncarehome/oncare?tab=%EC%84%9C%EB%B9%84%EC%8A%A4+%EC%86%8C%EA%B0%9C",
             "이벤트 페이지": "https://solaroncare.com/oncarehome/coupons",
             "콘텐츠 페이지": "https://solaroncare.com/oncarehome/contents"
         }
         for name, url in pages.items():
-            driver.get(url)
-            time.sleep(3)
-            if "solaroncare" in driver.current_url:
-                report_details.append(f"✅ {name} : 정상")
-            else:
+            try:
+                driver.get(url)
+                time.sleep(3)
+                if "solaroncare" in driver.current_url:
+                    report_details.append(f"✅ {name} : 정상")
+                else:
+                    total_status = "오류발생"
+                    report_details.append(f"❌ {name} : 오류")
+            except:
                 total_status = "오류발생"
-                report_details.append(f"❌ {name} : 오류")
+                report_details.append(f"❌ {name} : 접속에러")
 
-        # 2. 구글 검색 광고 체크 (추가된 기능)
-        print("구글 광고 체크 중...")
-        driver.get("https://www.google.com/search?q=%EC%86%94%EB%9D%BC%EC%98%A8%EC%BC%80%EC%96%B4")
-        time.sleep(5)
-
-        try:
-            # 구글 검색 결과에서 '광고' 섹션의 제목들 추출
-            # h3 태그 중 광고 영역에 포함된 것들을 찾습니다.
-            ad_elements = driver.find_elements(By.CSS_SELECTOR, "div[data-text-ad] h3, .CC_Anc h3")
-            
-            if ad_elements:
-                ad_titles = [el.text for el in ad_elements if el.text]
-                for i, title in enumerate(ad_titles):
-                    report_details.append(f"🔍 구글 광고 {i+1}: {title}")
-            else:
-                report_details.append("ℹ️ 구글 광고: 현재 노출되는 광고 없음")
-        except:
-            report_details.append("⚠️ 구글 광고: 영역 분석 실패")
-
-        # 3. 네이버 BSA 영역 (고정값 유지)
+        # 2. 네이버 BSA 영역 (고정값)
         report_details.append("✅ 네이버 BSA 메인 : 정상")
         report_details.append("✅ 네이버 BSA 썸네일1 : 정상")
         report_details.append("✅ 네이버 BSA 썸네일2 : 정상")
         report_details.append("✅ 네이버 BSA 썸네일3 : 정상")
+
+        # 3. 구글 검색 광고 체크 (가장 마지막에 배치)
+        print("구글 광고 정밀 체크 중...")
+        driver.get("https://www.google.com/search?q=%EC%86%94%EB%9D%BC%EC%98%A8%EC%BC%80%EC%96%B4")
+        time.sleep(5)
+
+        try:
+            # 이미지상의 '솔라온케어 공식' 같은 광고 제목을 잡기 위한 다양한 필터링
+            # 구글의 광고 섹션(data-text-ad, v9i77d 등) 내부의 제목(h3, span, div)을 광범위하게 수집
+            ad_selectors = [
+                "div[data-text-ad] h3", 
+                "div[role='region'] h3",
+                ".v9i77d h3",
+                "a[data-pcu] h3",
+                ".CC_Anc h3"
+            ]
+            
+            ad_titles = []
+            for selector in ad_selectors:
+                elements = driver.find_elements(By.CSS_SELECTOR, selector)
+                for el in elements:
+                    if el.text and el.text not in ad_titles:
+                        ad_titles.append(el.text)
+            
+            if ad_titles:
+                for i, title in enumerate(ad_titles):
+                    google_ads.append(f"🔍 구글 SA {['첫번째', '두번째', '세번째', '네번째'][i] if i < 4 else i+1}: {title}")
+            else:
+                google_ads.append("ℹ️ 구글 광고: 현재 노출되는 광고 없음")
+        except:
+            google_ads.append("⚠️ 구글 광고: 영역 분석 실패")
+
+        # 자사/네이버 결과 뒤에 구글 광고 결과 붙이기
+        report_details.extend(google_ads)
 
     except Exception as e:
         total_status = "시스템에러"
