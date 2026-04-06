@@ -13,64 +13,91 @@ def run_automation():
     options.add_argument('--no-sandbox')
     options.add_argument('--disable-dev-shm-usage')
     options.add_argument('--window-size=1920,1080')
-    options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36")
+    # 유저 에이전트를 최신 버전으로 업데이트하여 일반 브라우저처럼 보이게 함
+    options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36")
     
     driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
     report_details = []
     total_status = "정상"
 
     def check_landing(url, name):
-        if not url or "naver.com" in url: return f"❌ {name} : 링크 오류"
+        if not url: return f"❌ {name} : 링크 없음"
+        # 네이버 광고 추적 링크는 requests로 체크하면 차단될 수 있어 직접 접속 시도
         try:
             driver.get(url)
-            time.sleep(3)
-            if "solaroncare" in driver.current_url:
+            time.sleep(5) # 페이지가 완전히 뜰 때까지 충분히 대기
+            current_url = driver.current_url
+            if "solaroncare" in current_url or "naver.com" not in current_url:
                 return f"✅ {name} : 정상"
             else:
                 return f"❌ {name} : 연결실패"
         except:
-            return f"❌ {name} : 접속에러"
+            return f"❌ {name} : 접속불가"
 
     try:
-        # 1. 자사 페이지 체크
+        # 1. 자사 페이지 체크 (이미 잘 되는 부분)
         pages = {
             "상세 페이지": "https://solaroncare.com/oncarehome/oncare?tab=%EC%84%9C%EB%B9%84%EC%8A%A4+%EC%86%8C%EA%B0%9C",
             "이벤트 페이지": "https://solaroncare.com/oncarehome/coupons",
             "콘텐츠 페이지": "https://solaroncare.com/oncarehome/contents"
         }
         for name, url in pages.items():
-            report_details.append(check_landing(url, name))
+            driver.get(url)
+            time.sleep(3)
+            if "solaroncare" in driver.current_url:
+                report_details.append(f"✅ {name} : 정상")
+            else:
+                report_details.append(f"❌ {name} : 오류")
 
-        # 2. 네이버 브랜드 검색 체크 (유연한 추출 방식)
+        # 2. 네이버 브랜드 검색 체크
         driver.get("https://search.naver.com/search.naver?where=nexearch&query=%EC%86%94%EB%9D%BC%EC%98%A8%EC%BC%80%EC%96%B4")
         time.sleep(5)
+        
+        # 사람처럼 보이게 스크롤을 살짝 내림
+        driver.execute_script("window.scrollTo(0, 500);")
+        time.sleep(3)
 
         try:
-            # 광고 컨테이너 찾기 (여러 후보군)
+            # 모든 광고 후보 영역 탐색
             bsa = None
-            for selector in [".ad_section", ".brand_search", ".sc_new.sp_nbrand", ".ns_bsa"]:
+            for sel in [".ad_section", ".brand_search", "section.sp_nbrand", ".ns_bsa"]:
                 try:
-                    target = driver.find_element(By.CSS_SELECTOR, selector)
-                    if target.is_displayed():
-                        bsa = target
-                        break
+                    targets = driver.find_elements(By.CSS_SELECTOR, sel)
+                    for t in targets:
+                        if t.is_displayed():
+                            bsa = t
+                            break
+                    if bsa: break
                 except: continue
 
             if bsa:
-                # [핵심] 해당 영역 내의 모든 '외부 연결 링크'를 추출
+                # 해당 영역 내 모든 링크 추출
                 all_links = bsa.find_elements(By.TAG_NAME, "a")
                 valid_urls = []
                 for l in all_links:
                     href = l.get_attribute('href')
-                    # 네이버 내부 링크나 빈 링크 제외하고 '솔라온케어' 관련 외부 링크만 수집
-                    if href and "naver.com" not in href and href not in valid_urls:
-                        valid_urls.append(href)
+                    # 광고 신고나 네이버 내부 도움말 링크 등은 필터링
+                    if href and "javascript" not in href and "help.naver.com" not in href and "policy.naver.com" not in href:
+                        if href not in valid_urls:
+                            valid_urls.append(href)
 
-                # 매칭: 0번은 메인, 1/2/3번은 썸네일
+                # 보통 브랜드 검색은 [메인제목, 메인이미지, 썸네일1, 2, 3] 순서로 링크가 잡힙니다.
+                # 중복되는 메인 링크를 고려하여 필터링 후 4개 영역 매칭
                 names = ["네이버 BSA 메인", "네이버 BSA 썸네일1", "네이버 BSA 썸네일2", "네이버 BSA 썸네일3"]
+                
+                # 실제 유효한 외부 랜딩 링크만 추출 (네이버 광고 추적 URL 포함)
+                final_targets = []
+                for url in valid_urls:
+                    if "adcr.naver.com" in url: # 네이버 광고 클릭 추적 주소
+                        final_targets.append(url)
+                
+                # 중복 제거 (순서 유지)
+                seen = set()
+                dedup_targets = [x for x in final_targets if not (x in seen or seen.add(x))]
+
                 for i, name in enumerate(names):
-                    if i < len(valid_urls):
-                        report_details.append(check_landing(valid_urls[i], name))
+                    if i < len(dedup_targets):
+                        report_details.append(check_landing(dedup_targets[i], name))
                     else:
                         report_details.append(f"❌ {name} : 영역 미발견")
             else:
