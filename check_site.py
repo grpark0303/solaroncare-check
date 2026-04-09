@@ -29,9 +29,22 @@ def run_automation():
         "source": "Object.defineProperty(navigator, 'webdriver', {get: () => false})"
     })
 
-    wait = WebDriverWait(driver, 60)
     report_details = []
     total_status = "정상"
+
+    def smart_click(xpath, timeout=30):
+        """요소가 나타날 때까지 1초마다 확인하며 클릭 시도"""
+        start_time = time.time()
+        while time.time() - start_time < timeout:
+            try:
+                el = driver.find_element(By.XPATH, xpath)
+                driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", el)
+                time.sleep(1)
+                driver.execute_script("arguments[0].click();", el)
+                return True
+            except:
+                time.sleep(1)
+        return False
 
     try:
         user_id = os.environ.get('EMAIL_ID')
@@ -39,73 +52,65 @@ def run_automation():
 
         # 1. 로그인
         driver.get("https://solaroncare.com/oncarehome/login")
-        time.sleep(15) 
+        time.sleep(15)
         inputs = driver.find_elements(By.TAG_NAME, "input")
         driver.execute_script("arguments[0].value = arguments[1];", inputs[0], user_id)
         driver.execute_script("arguments[0].value = arguments[1];", inputs[1], user_pw)
         inputs[1].send_keys(Keys.ENTER)
-        time.sleep(20) 
+        time.sleep(20)
 
         # 2. 예약 신청
         driver.get("https://solaroncare.com/oncarehome/oncare?tab=%EC%84%9C%EB%B9%84%EC%8A%A4+%EC%86%8C%EA%B0%9C")
         time.sleep(15)
 
-        # [단계별 실행 및 상세 기록]
-        try:
-            # 1) 상담 예약하기 (텍스트 검색 대신 모든 버튼 중 마지막 것 타격)
-            btn1 = wait.until(EC.presence_of_all_elements_located((By.XPATH, "//button | //a[contains(@class, 'button')]")))
-            # 화면 가장 하단에 있을 가능성이 높은 마지막 버튼을 클릭
-            driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", btn1[-1])
-            time.sleep(3)
-            driver.execute_script("arguments[0].click();", btn1[-1])
-            time.sleep(12)
+        # [단계별 정밀 타격]
+        # 1) 상담 예약하기
+        if not smart_click("//*[contains(text(), '상담 예약')]"):
+            raise Exception("상담예약하기 버튼 미발견")
+        time.sleep(10)
 
-            # 2) 보유 네 버튼 (정확한 텍스트 매칭 재시도)
-            btn2 = wait.until(EC.presence_of_element_located((By.XPATH, "//*[contains(text(), '네, 보유')]")))
-            driver.execute_script("arguments[0].click();", btn2)
-            time.sleep(8)
+        # 2) 보유 네 버튼
+        if not smart_click("//*[normalize-space()='네, 보유하고 있습니다.(준공 및 인허가 단계 포함)'] | //*[contains(text(), '네, 보유')]"):
+            raise Exception("보유 네 버튼 미발견")
+        time.sleep(5)
 
-            # 3) 필수 동의 체크
-            agree_el = wait.until(EC.presence_of_element_located((By.XPATH, "//*[contains(text(), '필수') and not(contains(text(), '전체'))]")))
-            driver.execute_script("""
-                var cb = arguments[0].closest('div').querySelector('input');
-                if(cb) { cb.checked = true; cb.click(); } else { arguments[0].click(); }
-            """, agree_el)
-            time.sleep(5)
+        # 3) 필수 동의 체크
+        if not smart_click("//*[contains(text(), '필수') and not(contains(text(), '전체'))]"):
+            raise Exception("필수동의 체크 미발견")
+        time.sleep(3)
 
-            # 4) 최종 예약하기 제출
-            final_btns = driver.find_elements(By.XPATH, "//button[contains(., '예약하기')]")
-            driver.execute_script("arguments[0].click();", final_btns[-1])
-            time.sleep(20)
+        # 4) 최종 예약하기 제출
+        if not smart_click("//button[contains(., '예약하기')] | //*[text()='예약하기']"):
+            raise Exception("최종 예약하기 버튼 미발견")
+        time.sleep(15)
 
-            if "/result" in driver.current_url.lower():
-                report_details.append("✅ 상담 예약 신청 : 완료")
-            else:
-                report_details.append("❌ 상담 예약 신청 : 실패(최종 페이지 미도달)")
-                total_status = "오류발생"
-
-        except Exception as e:
-            # 어디서 멈췄는지 알기 위해 에러 메시지 일부 포함
-            report_details.append(f"❌ 상담 예약 신청 : 실패({str(e)[:20]}...)")
+        # 최종 확인
+        if "/result" in driver.current_url.lower():
+            report_details.append("✅ 상담 예약 신청 : 완료")
+        else:
+            report_details.append(f"❌ 상담 예약 신청 : 실패(결과페이지 미도달 - {driver.current_url})")
             total_status = "오류발생"
 
-        # 3. 자사 페이지 점검
-        for name, url in {"상세 페이지": "https://solaroncare.com/oncarehome/oncare?tab=%EC%84%9C%EB%B9%84%EC%8A%A4+%EC%86%8C%EA%B0%9C",
-                          "이벤트 페이지": "https://solaroncare.com/oncarehome/coupons",
-                          "콘텐츠 페이지": "https://solaroncare.com/oncarehome/contents"}.items():
+    except Exception as e:
+        report_details.append(f"❌ 상담 예약 신청 : 실패({str(e)})")
+        total_status = "오류발생"
+
+    # 3. 자사 페이지 점검
+    pages = {"상세 페이지": "https://solaroncare.com/oncarehome/oncare?tab=%EC%84%9C%EB%B9%84%EC%8A%A4+%EC%86%8C%EA%B0%9C",
+             "이벤트 페이지": "https://solaroncare.com/oncarehome/coupons",
+             "콘텐츠 페이지": "https://solaroncare.com/oncarehome/contents"}
+    for name, url in pages.items():
+        try:
             driver.get(url)
             time.sleep(8)
             report_details.append(f"✅ {name} : 정상")
+        except:
+            report_details.append(f"❌ {name} : 오류")
 
-        report_details.extend(["✅ 네이버 BSA 메인 : 정상", "✅ 네이버 BSA 썸네일1 : 정상", "✅ 네이버 BSA 썸네일2 : 정상", "✅ 네이버 BSA 썸네일3 : 정상"])
+    report_details.extend(["✅ 네이버 BSA 메인 : 정상", "✅ 네이버 BSA 썸네일1 : 정상", "✅ 네이버 BSA 썸네일2 : 정상", "✅ 네이버 BSA 썸네일3 : 정상"])
 
-    except Exception:
-        total_status = "오류발생"
-        report_details.append("❌ 시스템 최종 오류")
-    
-    finally:
-        driver.quit()
-        send_to_google_form(total_status, "\n".join(report_details))
+    driver.quit()
+    send_to_google_form(total_status, "\n".join(report_details))
 
 def send_to_google_form(status, detail):
     form_url = "https://docs.google.com/forms/d/e/1FAIpQLSdF9Q5waHP_dlPK35TonomQxbqph6SIYAoNa9FgXxjd8AJstw/formResponse"
