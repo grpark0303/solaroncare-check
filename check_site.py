@@ -11,6 +11,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.common.action_chains import ActionChains
 
 def run_automation():
     options = Options()
@@ -32,69 +33,68 @@ def run_automation():
     wait = WebDriverWait(driver, 30)
     report_details = []
     total_status = "정상"
-    step = "시작"
+    step = "준비"
 
     try:
         user_id = os.environ.get('EMAIL_ID')
         user_pw = os.environ.get('EMAIL_PW')
 
-        # 1. 로그인 (가장 원시적이고 강력한 방식)
-        step = "로그인 정보 입력"
+        # 1. 로그인 (수동 주입 방식 유지)
+        step = "로그인 시도"
         driver.get("https://solaroncare.com/oncarehome/login")
-        time.sleep(12) # 로딩 시간 대폭 증가
-
+        time.sleep(12)
         try:
-            # 모든 input 태그를 다 긁어옴
-            all_inputs = driver.find_elements(By.TAG_NAME, "input")
-            # 아이디와 비번 칸에 직접 값 주입
-            driver.execute_script("arguments[0].value = arguments[1];", all_inputs[0], user_id)
-            driver.execute_script("arguments[0].value = arguments[1];", all_inputs[1], user_pw)
-            time.sleep(2)
-            # 비번 칸에서 엔터
-            all_inputs[1].send_keys(Keys.ENTER)
+            inputs = driver.find_elements(By.TAG_NAME, "input")
+            driver.execute_script("arguments[0].value = arguments[1];", inputs[0], user_id)
+            driver.execute_script("arguments[0].value = arguments[1];", inputs[1], user_pw)
+            time.sleep(1)
+            inputs[1].send_keys(Keys.ENTER)
             time.sleep(15) 
-            print(">>> 로그인 시도 완료")
-        except Exception:
+        except:
             report_details.append("❌ 로그인 단계 : 실패")
             total_status = "오류발생"
 
         # 2. 예약 신청
-        step = "예약 신청 페이지 접속"
+        step = "예약 페이지 접속"
         driver.get("https://solaroncare.com/oncarehome/oncare?tab=%EC%84%9C%EB%B9%84%EC%8A%A4+%EC%86%8C%EA%B0%9C")
         time.sleep(10)
 
         try:
-            # 1) 상담 예약하기 클릭
+            # 1) 상담 예약하기
             step = "상담 예약하기 클릭"
             btn1 = wait.until(EC.presence_of_element_located((By.XPATH, "//*[contains(text(), '상담 예약')]")))
             driver.execute_script("arguments[0].click();", btn1)
-            time.sleep(5)
+            time.sleep(8)
 
-            # 2) 보유 네 버튼 클릭
+            # 2) 보유 네 버튼 (전방위적 타겟팅)
             step = "보유 네 버튼 클릭"
-            btn2 = wait.until(EC.presence_of_element_located((By.XPATH, "//*[contains(text(), '네, 보유')]")))
-            driver.execute_script("arguments[0].click();", btn2)
+            try:
+                # 방법 A: '네, 보유' 글자가 포함된 모든 요소 중 가장 위쪽(첫 번째) 버튼 강제 클릭
+                target_elements = driver.find_elements(By.XPATH, "//*[contains(text(), '네, 보유')]")
+                driver.execute_script("arguments[0].click();", target_elements[0])
+            except:
+                # 방법 B: 좌표 기반 클릭 (중앙 팝업 영역)
+                ActionChains(driver).move_by_offset(960, 500).click().perform()
             time.sleep(5)
 
-            # 3) 필수 동의 체크 (전체 동의 제외)
+            # 3) 필수 동의 체크 (전체동의 회피 및 input 직접 타격)
             step = "필수 동의 체크"
-            agree_area = wait.until(EC.presence_of_element_located((By.XPATH, "//*[contains(text(), '개인정보') and contains(text(), '필수') and not(contains(text(), '전체'))]")))
-            # 글자 옆의 실제 체크박스(input)를 찾아 강제 클릭
+            agree_xpath = "//*[contains(text(), '개인정보') and contains(text(), '필수') and not(contains(text(), '전체'))]"
+            agree_element = wait.until(EC.presence_of_element_located((By.XPATH, agree_xpath)))
             driver.execute_script("""
-                var parent = arguments[0].parentElement;
-                var checkbox = parent.querySelector('input');
-                if(checkbox) { checkbox.click(); }
-                else { arguments[0].click(); }
-            """, agree_area)
+                var el = arguments[0];
+                var box = el.parentElement.querySelector('input') || el.querySelector('input') || el;
+                box.click();
+            """, agree_element)
             time.sleep(3)
 
-            # 4) 최종 예약하기 제출
+            # 4) 최종 제출
             step = "최종 예약하기 제출"
-            final_btn = wait.until(EC.presence_of_element_located((By.XPATH, "//button[text()='예약하기'] | //button[contains(., '예약하기')]")))
+            final_btn = wait.until(EC.presence_of_element_located((By.XPATH, "//button[contains(., '예약하기')]")))
             driver.execute_script("arguments[0].click();", final_btn)
             time.sleep(12)
 
-            # 5) 최종 확인
+            # 5) 최종 검증
             if "/oncare/result" in driver.current_url:
                 report_details.append("✅ 상담 예약 신청 : 완료")
             else:
@@ -105,10 +105,11 @@ def run_automation():
             report_details.append(f"❌ 상담 예약 신청 : 실패({step})")
             total_status = "오류발생"
 
-        # 3. 자사 페이지 검증
-        for name, url in {"상세 페이지": "https://solaroncare.com/oncarehome/oncare?tab=%EC%84%9C%EB%B9%84%EC%8A%A4+%EC%86%8C%EA%B0%9C",
-                          "이벤트 페이지": "https://solaroncare.com/oncarehome/coupons",
-                          "콘텐츠 페이지": "https://solaroncare.com/oncarehome/contents"}.items():
+        # 3. 자사 페이지 점검 (실제 이동)
+        pages = {"상세 페이지": "https://solaroncare.com/oncarehome/oncare?tab=%EC%84%9C%EB%B9%84%EC%8A%A4+%EC%86%8C%EA%B0%9C",
+                 "이벤트 페이지": "https://solaroncare.com/oncarehome/coupons",
+                 "콘텐츠 페이지": "https://solaroncare.com/oncarehome/contents"}
+        for name, url in pages.items():
             driver.get(url)
             time.sleep(5)
             report_details.append(f"✅ {name} : 정상")
@@ -118,7 +119,7 @@ def run_automation():
 
     except Exception:
         total_status = "오류발생"
-        report_details.append(f"❌ 시스템 최종 오류")
+        report_details.append("❌ 시스템 최종 오류")
     
     finally:
         driver.quit()
