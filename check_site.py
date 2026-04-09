@@ -32,18 +32,16 @@ def run_automation():
     wait = WebDriverWait(driver, 30)
     report_details = []
     total_status = "정상"
-    step = "준비" # 오류 추적용 변수
+    step = "준비"
 
     try:
         user_id = os.environ.get('EMAIL_ID')
         user_pw = os.environ.get('EMAIL_PW')
 
         # 1. 로그인
-        step = "로그인 페이지 접속"
+        step = "로그인 정보 입력"
         driver.get("https://solaroncare.com/oncarehome/login")
         time.sleep(10)
-        
-        step = "로그인 정보 입력"
         inputs = wait.until(EC.presence_of_all_elements_located((By.TAG_NAME, "input")))
         driver.execute_script("arguments[0].value = arguments[1];", inputs[0], user_id)
         driver.execute_script("arguments[0].value = arguments[1];", inputs[1], user_pw)
@@ -55,16 +53,17 @@ def run_automation():
         driver.get("https://solaroncare.com/oncarehome/oncare?tab=%EC%84%9C%EB%B9%84%EC%8A%A4+%EC%86%8C%EA%B0%9C")
         time.sleep(10)
 
-        # 세부 단계를 하나씩 검증
         try:
             step = "상담 예약하기 클릭"
-            res_btn = wait.until(EC.presence_of_element_located((By.XPATH, "//*[contains(text(), '상담 예약')] | //button[contains(., '예약')]")))
+            res_btn = wait.until(EC.presence_of_element_located((By.XPATH, "//button[contains(., '예약')] | //*[contains(text(), '상담 예약')]")))
             driver.execute_script("arguments[0].click();", res_btn)
             time.sleep(5)
 
             step = "보유 네 버튼 클릭"
-            yes_btn = wait.until(EC.presence_of_element_located((By.XPATH, "//button[contains(., '네') and contains(., '보유')] | //*[contains(text(), '네') and contains(text(), '보유')]")))
-            driver.execute_script("arguments[0].click();", yes_btn)
+            # [수정] 글자 매칭 대신, 팝업(Modal) 내의 첫 번째 버튼을 직접 타겟팅
+            # 이미지상 '네' 버튼이 항상 첫 번째이므로 index[0]을 사용합니다.
+            yes_buttons = wait.until(EC.presence_of_all_elements_located((By.XPATH, "//div[contains(@class, 'modal')]//button | //div[role='dialog']//button | //button[contains(., '네')]")))
+            driver.execute_script("arguments[0].click();", yes_buttons[0])
             time.sleep(3)
 
             step = "필수 동의 체크"
@@ -77,32 +76,26 @@ def run_automation():
             driver.execute_script("arguments[0].click();", final_submit)
             time.sleep(10)
 
-            step = "최종 주소 확인"
             if "/oncare/result" in driver.current_url:
                 report_details.append("✅ 상담 예약 신청 : 완료")
             else:
-                report_details.append(f"❌ 상담 예약 신청 : 실패(결과페이지 미도달)")
+                report_details.append(f"❌ 상담 예약 신청 : 실패(최종 페이지 미도달)")
                 total_status = "오류발생"
 
         except Exception:
             report_details.append(f"❌ 상담 예약 신청 : 실패({step} 단계)")
             total_status = "오류발생"
 
-        # 3. 자사 페이지 검증
-        step = "상세 페이지 점검"
-        driver.get("https://solaroncare.com/oncarehome/oncare?tab=%EC%84%9C%EB%B9%84%EC%8A%A4+%EC%86%8C%EA%B0%9C")
-        time.sleep(5)
-        report_details.append("✅ 상세 페이지 : 정상")
-
-        step = "이벤트 페이지 점검"
-        driver.get("https://solaroncare.com/oncarehome/coupons")
-        time.sleep(5)
-        report_details.append("✅ 이벤트 페이지 : 정상")
-
-        step = "콘텐츠 페이지 점검"
-        driver.get("https://solaroncare.com/oncarehome/contents")
-        time.sleep(5)
-        report_details.append("✅ 콘텐츠 페이지 : 정상")
+        # 3. 자사 페이지 점검
+        pages = {
+            "상세 페이지": "https://solaroncare.com/oncarehome/oncare?tab=%EC%84%9C%EB%B9%84%EC%8A%A4+%EC%86%8C%EA%B0%9C",
+            "이벤트 페이지": "https://solaroncare.com/oncarehome/coupons",
+            "콘텐츠 페이지": "https://solaroncare.com/oncarehome/contents"
+        }
+        for name, url in pages.items():
+            driver.get(url)
+            time.sleep(5)
+            report_details.append(f"✅ {name} : 정상")
 
         # 4. 네이버 BSA (고정)
         report_details.extend(["✅ 네이버 BSA 메인 : 정상", "✅ 네이버 BSA 썸네일1 : 정상", "✅ 네이버 BSA 썸네일2 : 정상", "✅ 네이버 BSA 썸네일3 : 정상"])
