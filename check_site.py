@@ -11,6 +11,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.common.action_chains import ActionChains
 
 def run_automation():
     options = Options()
@@ -60,39 +61,43 @@ def run_automation():
             driver.execute_script("arguments[0].click();", btn1)
             time.sleep(10)
 
-            # 2) 보유 네 버튼 (무차별 클릭 방식 유지)
+            # 2) 보유 네 버튼
             step = "보유 네 버튼 클릭"
             yes_els = driver.find_elements(By.XPATH, "//*[contains(text(), '네') and contains(text(), '보유')]")
-            for el in yes_els:
-                driver.execute_script("arguments[0].click();", el)
+            driver.execute_script("arguments[0].click();", yes_els[0])
             time.sleep(5)
 
-            # 3) 필수 동의 체크 (성공한 로직 유지)
+            # 3) 필수 동의 체크
             step = "필수 동의 체크"
             agree_xpath = "//*[contains(text(), '필수') and not(contains(text(), '전체'))]"
             agree_el = wait.until(EC.presence_of_element_located((By.XPATH, agree_xpath)))
             driver.execute_script("""
-                var textEl = arguments[0];
-                var container = textEl.closest('div') || textEl.parentElement;
-                var checkbox = container.querySelector('input[type="checkbox"]') || container.querySelector('input');
-                if (checkbox) {
-                    checkbox.checked = true;
-                    checkbox.click();
-                } else {
-                    textEl.click();
-                }
+                var el = arguments[0];
+                var container = el.closest('div') || el.parentElement;
+                var cb = container.querySelector('input');
+                if(cb) { cb.checked = true; cb.click(); } else { el.click(); }
             """, agree_el)
-            time.sleep(5) # 동의 후 버튼 활성화 대기 시간 늘림
+            time.sleep(5)
 
-            # 4) 최종 제출 (보강)
+            # 4) 최종 제출 (필살기 모음)
             step = "최종 예약하기 제출"
-            # '예약하기'라는 글자가 들어간 모든 요소를 찾아 가장 마지막에 있는 것(주로 하단 버튼)을 클릭
-            final_btns = driver.find_elements(By.XPATH, "//*[text()='예약하기'] | //button[contains(., '예약하기')] | //*[contains(text(), '혜택 받기')]")
-            driver.execute_script("arguments[0].click();", final_btns[-1]) 
-            time.sleep(15) # 결과 페이지 로딩 대기
+            # [방법 A] 가장 하단에 있는 '예약하기' 텍스트 요소 찾기
+            final_btn = driver.find_elements(By.XPATH, "//*[text()='예약하기' or contains(text(), '예약하기')]")[-1]
+            driver.execute_script("arguments[0].scrollIntoView(true);", final_btn)
+            time.sleep(2)
+            
+            # [방법 B] 자바스크립트 클릭 + 마우스 좌표 클릭 + 엔터키 입력 콤보
+            try:
+                driver.execute_script("arguments[0].click();", final_btn)
+                ActionChains(driver).move_to_element(final_btn).click().perform()
+                final_btn.send_keys(Keys.ENTER)
+            except:
+                pass 
+                
+            time.sleep(15) # 결과 페이지 이동 대기
 
             # 5) 최종 확인
-            if "/oncare/result" in driver.current_url or "result" in driver.current_url.lower():
+            if "/result" in driver.current_url.lower():
                 report_details.append("✅ 상담 예약 신청 : 완료")
             else:
                 report_details.append(f"❌ 상담 예약 신청 : 실패(결과페이지 미도달)")
@@ -103,10 +108,9 @@ def run_automation():
             total_status = "오류발생"
 
         # 3. 자사 페이지 점검
-        pages = {"상세 페이지": "https://solaroncare.com/oncarehome/oncare?tab=%EC%84%9C%EB%B9%84%EC%8A%A4+%EC%86%8C%EA%B0%9C",
-                 "이벤트 페이지": "https://solaroncare.com/oncarehome/coupons",
-                 "콘텐츠 페이지": "https://solaroncare.com/oncarehome/contents"}
-        for name, url in pages.items():
+        for name, url in {"상세 페이지": "https://solaroncare.com/oncarehome/oncare?tab=%EC%84%9C%EB%B9%84%EC%8A%A4+%EC%86%8C%EA%B0%9C",
+                          "이벤트 페이지": "https://solaroncare.com/oncarehome/coupons",
+                          "콘텐츠 페이지": "https://solaroncare.com/oncarehome/contents"}.items():
             driver.get(url)
             time.sleep(5)
             report_details.append(f"✅ {name} : 정상")
