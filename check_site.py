@@ -22,7 +22,7 @@ def run_automation():
     options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
     
     driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
-    wait = WebDriverWait(driver, 40) # 인내심 끝판왕 40초
+    wait = WebDriverWait(driver, 40) 
     
     report_details = []
     total_status = "정상"
@@ -38,34 +38,54 @@ def run_automation():
         inputs[0].send_keys(user_id)
         inputs[1].send_keys(user_pw)
         inputs[1].send_keys(Keys.ENTER)
-        time.sleep(10)
+        time.sleep(12)
 
         # 2. 예약 신청 페이지 이동
         driver.get("https://solaroncare.com/oncarehome/oncare?tab=%EC%84%9C%EB%B9%84%EC%8A%A4+%EC%86%8C%EA%B0%9C")
         
         try:
-            # 1) 상담 예약하기
-            btn1 = wait.until(EC.element_to_be_clickable((By.XPATH, "//*[contains(text(), '상담 예약')]")))
+            # 1) 상담 예약하기 (자바스크립트 강제 타격)
+            btn1 = wait.until(EC.presence_of_element_located((By.XPATH, "//*[contains(text(), '상담 예약')]")))
             driver.execute_script("arguments[0].click();", btn1)
+            time.sleep(10) # 팝업 로딩 충분히 대기
             
-            # 2) [여기가 승부처] 팝업창이 나타날 때까지 대기 (최대 30초)
-            # 텍스트 매칭 대신, '보유'라는 글자를 포함한 버튼이 '보일 때'까지 대기
-            target_btn = wait.until(EC.visibility_of_element_located((By.XPATH, "//button[contains(., '보유') and contains(., '네')] | //*[contains(text(), '네') and contains(text(), '보유')]")))
+            # 2) [승부수] 보유 버튼 - 모든 버튼을 긁어서 '네'와 '보유'가 들어간 첫 번째 놈을 JS로 강제 실행
+            driver.execute_script("""
+                var btns = document.querySelectorAll('button, div[role="button"], span');
+                for (var i = 0; i < btns.length; i++) {
+                    var text = btns[i].innerText || btns[i].textContent;
+                    if (text.includes('네') && text.includes('보유')) {
+                        btns[i].click();
+                        // 클릭이 안 먹을 경우를 대비해 커스텀 이벤트까지 발생
+                        var clickEvent = new MouseEvent('click', { 'view': window, 'bubbles': true, 'cancelable': true });
+                        btns[i].dispatchEvent(clickEvent);
+                        break;
+                    }
+                }
+            """)
+            time.sleep(7)
             
-            # 찾았으면 확실하게 JS로 클릭
-            driver.execute_script("arguments[0].click();", target_btn)
+            # 3) 필수 동의 체크 (자바스크립트로 강제 체크)
+            driver.execute_script("""
+                var labels = document.querySelectorAll('label, span, div');
+                for (var i = 0; i < labels.length; i++) {
+                    if (labels[i].innerText.includes('필수') && !labels[i].innerText.includes('전체')) {
+                        labels[i].click();
+                        // 주변의 input 체크박스도 강제로 true
+                        var parent = labels[i].parentElement;
+                        var cb = parent.querySelector('input[type="checkbox"]');
+                        if (cb) cb.checked = true;
+                        break;
+                    }
+                }
+            """)
             time.sleep(5)
             
-            # 3) 필수 동의 체크
-            agree_el = wait.until(EC.element_to_be_clickable((By.XPATH, "//*[contains(text(), '필수') and not(contains(text(), '전체'))]")))
-            driver.execute_script("arguments[0].click();", agree_el)
-            time.sleep(3)
-            
             # 4) 최종 예약하기 제출
-            submit_btns = wait.until(EC.presence_of_all_elements_located((By.XPATH, "//button[contains(., '예약하기')] | //*[text()='예약하기']")))
+            submit_btns = driver.find_elements(By.XPATH, "//button[contains(., '예약하기')] | //*[text()='예약하기']")
             driver.execute_script("arguments[0].click();", submit_btns[-1])
             
-            time.sleep(15)
+            time.sleep(20)
             if "result" in driver.current_url.lower():
                 report_details.append("✅ 상담 예약 신청 : 완료")
             else:
@@ -73,8 +93,7 @@ def run_automation():
                 total_status = "오류발생"
 
         except Exception as e:
-            # 상세 에러 기록
-            report_details.append(f"❌ 상담 예약 신청 : 실패({type(e).__name__})")
+            report_details.append(f"❌ 상담 예약 신청 : 실패({str(e).splitlines()[0]})")
             total_status = "오류발생"
 
         # 3. 자사 페이지 점검
@@ -103,7 +122,7 @@ def run_automation():
         send_to_google_form(total_status, "\n".join(report_details))
 
 def send_to_google_form(status, detail):
-    form_url = "https://docs.google.com/forms/e/1FAIpQLSdF9Q5waHP_dlPK35TonomQxbqph6SIYAoNa9FgXxjd8AJstw/formResponse"
+    form_url = "https://docs.google.com/forms/d/e/1FAIpQLSdF9Q5waHP_dlPK35TonomQxbqph6SIYAoNa9FgXxjd8AJstw/formResponse"
     payload = {"entry.1608092729": datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
                "entry.1702029548": status, "entry.1759228838": detail}
     requests.post(form_url, data=payload, timeout=10)
