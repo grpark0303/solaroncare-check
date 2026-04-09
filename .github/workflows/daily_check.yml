@@ -1,8 +1,9 @@
-name: Daily Site Check
+name: Daily Site Check  # <-- 이 부분이 왼쪽 이름을 결정합니다
 on:
   schedule:
-    - cron: '0 22 * * *' # 한국시간 오전 7시 (UTC 22:00)
-  workflow_dispatch: # 수동 실행 버튼 활성화
+    - cron: '0 22 * * *' # 한국시간 오전 7시
+  workflow_dispatch:      # <-- 이 부분이 있어야 오른쪽 'Run workflow' 버튼이 생깁니다!
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -15,7 +16,7 @@ jobs:
       - name: Install dependencies
         run: |
           pip install -r requirements.txt
-   - name: Run script
+      - name: Run script
         env:
           KAKAO_ID: ${{ secrets.KAKAO_ID }}
           KAKAO_PW: ${{ secrets.KAKAO_PW }}
