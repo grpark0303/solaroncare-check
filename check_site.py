@@ -45,23 +45,26 @@ def run_automation():
         # 1) 상담 예약하기 클릭
         btn1 = driver.find_element(By.XPATH, "//*[contains(text(), '상담 예약')]")
         driver.execute_script("arguments[0].click();", btn1)
-        time.sleep(12) 
+        time.sleep(10) 
 
-        # 2) [최종 수정] 텍스트 매칭 안 함. 팝업 내 '첫 번째' 버튼만 타격
-        # 이미지상 '네, 보유...' 버튼은 항상 상단(첫 번째)에 위치함
-        try:
-            # 팝업(모달) 영역 내에 있는 모든 버튼을 긁어옴
-            pop_btns = driver.find_elements(By.XPATH, "//div[contains(@class, 'modal')]//button | //div[contains(@class, 'popup')]//button | //button[contains(., '보유')]")
-            
-            if not pop_btns:
-                # 만약 위 조건으로 안 잡히면 페이지 내 모든 버튼 중 '보유' 글자가 있는 것들 수집
-                pop_btns = [b for b in driver.find_elements(By.TAG_NAME, "button") if "보유" in b.text]
-
-            # 리스트의 첫 번째(index 0) 버튼이 "네, 보유..." 버튼임
-            driver.execute_script("arguments[0].click();", pop_btns[0])
-            print(">>> 팝업 첫 번째 버튼 클릭 완료")
-        except Exception as e:
-            raise Exception(f"보유 버튼 순서 클릭 실패: {str(e)}")
+        # 2) [재시도 강화] 보유 네 버튼 클릭
+        clicked = False
+        for i in range(10): # 최대 10번 재시도 (약 20초)
+            try:
+                # 모든 버튼, div 중 '보유'가 포함된 요소를 싹 긁어옴
+                pop_btns = [b for b in driver.find_elements(By.XPATH, "//button | //div[@role='button'] | //span") if "보유" in b.text]
+                
+                # '아니오'와 구분하기 위해 '네'가 포함된 첫 번째 요소를 타겟
+                target = [b for b in pop_btns if "네" in b.text][0]
+                
+                driver.execute_script("arguments[0].click();", target)
+                clicked = True
+                break
+            except:
+                time.sleep(2) # 2초 쉬고 다시 찾기
+        
+        if not clicked:
+            raise Exception("보유 버튼 발견 실패 (10회 재시도 초과)")
         
         time.sleep(8)
 
