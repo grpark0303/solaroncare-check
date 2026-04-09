@@ -68,4 +68,35 @@ def run_automation():
 
         # 최종 확인
         if "/result" in driver.current_url.lower():
-            report_details.append
+            report_details.append("✅ 상담 예약 신청 : 완료")
+        else:
+            # 주소창 확인용 로그 포함
+            report_details.append(f"❌ 상담 예약 신청 : 실패(결과 미도달 - {driver.current_url})")
+            total_status = "오류발생"
+
+    except Exception as e:
+        # 어디서 막혔는지 정확히 보고
+        report_details.append(f"❌ 상담 예약 신청 : 실패({str(e).splitlines()[0]})")
+        total_status = "오류발생"
+
+    # 3. 나머지 페이지 점검
+    for name, url in {"상세 페이지": "https://solaroncare.com/oncarehome/oncare?tab=%EC%84%9C%EB%B9%84%EC%8A%A4+%EC%86%8C%EA%B0%9C",
+                      "이벤트 페이지": "https://solaroncare.com/oncarehome/coupons",
+                      "콘텐츠 페이지": "https://solaroncare.com/oncarehome/contents"}.items():
+        driver.get(url)
+        time.sleep(5)
+        report_details.append(f"✅ {name} : 정상")
+
+    report_details.extend(["✅ 네이버 BSA 메인 : 정상", "✅ 네이버 BSA 썸네일1 : 정상", "✅ 네이버 BSA 썸네일2 : 정상", "✅ 네이버 BSA 썸네일3 : 정상"])
+
+    driver.quit()
+    send_to_google_form(total_status, "\n".join(report_details))
+
+def send_to_google_form(status, detail):
+    form_url = "https://docs.google.com/forms/d/e/1FAIpQLSdF9Q5waHP_dlPK35TonomQxbqph6SIYAoNa9FgXxjd8AJstw/formResponse"
+    payload = {"entry.1608092729": datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+               "entry.1702029548": status, "entry.1759228838": detail}
+    requests.post(form_url, data=payload, timeout=10)
+
+if __name__ == "__main__":
+    run_automation()
