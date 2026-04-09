@@ -11,7 +11,6 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.keys import Keys
-from selenium.webdriver.common.action_chains import ActionChains
 
 def run_automation():
     options = Options()
@@ -57,17 +56,24 @@ def run_automation():
         try:
             # 1) 상담 예약하기
             step = "상담 예약하기 클릭"
-            btn1 = wait.until(EC.presence_of_element_located((By.XPATH, "//*[contains(text(), '상담 예약')]")))
+            btn1 = wait.until(EC.element_to_be_clickable((By.XPATH, "//*[contains(text(), '상담 예약')]")))
             driver.execute_script("arguments[0].click();", btn1)
             time.sleep(10)
 
-            # 2) 보유 네 버튼
+            # 2) [정밀 수정] 정확한 버튼명 클릭
             step = "보유 네 버튼 클릭"
-            yes_els = driver.find_elements(By.XPATH, "//*[contains(text(), '네') and contains(text(), '보유')]")
-            driver.execute_script("arguments[0].click();", yes_els[0])
+            # 가람님이 말씀하신 정확한 텍스트로 요소를 찾습니다.
+            exact_text = "네, 보유하고 있습니다.(준공 및 인허가 단계 포함)"
+            # normalize-space()를 써서 혹시 모를 앞뒤 공백을 제거하고 정확히 일치하는 요소를 찾습니다.
+            target_btn = wait.until(EC.presence_of_element_located((By.XPATH, f"//*[normalize-space()='{exact_text}']")))
+            
+            # 버튼이 화면 중앙에 오도록 스크롤 후 클릭
+            driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", target_btn)
+            time.sleep(2)
+            driver.execute_script("arguments[0].click();", target_btn)
             time.sleep(5)
 
-            # 3) 필수 동의 체크
+            # 3) 필수 동의 체크 (성공했던 로직)
             step = "필수 동의 체크"
             agree_xpath = "//*[contains(text(), '필수') and not(contains(text(), '전체'))]"
             agree_el = wait.until(EC.presence_of_element_located((By.XPATH, agree_xpath)))
@@ -79,22 +85,14 @@ def run_automation():
             """, agree_el)
             time.sleep(5)
 
-            # 4) 최종 제출 (필살기 모음)
+            # 4) 최종 예약하기 제출
             step = "최종 예약하기 제출"
-            # [방법 A] 가장 하단에 있는 '예약하기' 텍스트 요소 찾기
-            final_btn = driver.find_elements(By.XPATH, "//*[text()='예약하기' or contains(text(), '예약하기')]")[-1]
-            driver.execute_script("arguments[0].scrollIntoView(true);", final_btn)
+            final_btns = driver.find_elements(By.XPATH, "//*[text()='예약하기' or contains(text(), '예약하기')]")
+            final_btn = final_btns[-1]
+            driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", final_btn)
             time.sleep(2)
-            
-            # [방법 B] 자바스크립트 클릭 + 마우스 좌표 클릭 + 엔터키 입력 콤보
-            try:
-                driver.execute_script("arguments[0].click();", final_btn)
-                ActionChains(driver).move_to_element(final_btn).click().perform()
-                final_btn.send_keys(Keys.ENTER)
-            except:
-                pass 
-                
-            time.sleep(15) # 결과 페이지 이동 대기
+            driver.execute_script("arguments[0].click();", final_btn)
+            time.sleep(15)
 
             # 5) 최종 확인
             if "/result" in driver.current_url.lower():
@@ -108,11 +106,12 @@ def run_automation():
             total_status = "오류발생"
 
         # 3. 자사 페이지 점검
-        for name, url in {"상세 페이지": "https://solaroncare.com/oncarehome/oncare?tab=%EC%84%9C%EB%B9%84%EC%8A%A4+%EC%86%8C%EA%B0%9C",
-                          "이벤트 페이지": "https://solaroncare.com/oncarehome/coupons",
-                          "콘텐츠 페이지": "https://solaroncare.com/oncarehome/contents"}.items():
+        pages = {"상세 페이지": "https://solaroncare.com/oncarehome/oncare?tab=%EC%84%9C%EB%B9%84%EC%8A%A4+%EC%86%8C%EA%B0%9C",
+                 "이벤트 페이지": "https://solaroncare.com/oncarehome/coupons",
+                 "콘텐츠 페이지": "https://solaroncare.com/oncarehome/contents"}
+        for name, url in pages.items():
             driver.get(url)
-            time.sleep(5)
+            time.sleep(6)
             report_details.append(f"✅ {name} : 정상")
 
         report_details.extend(["✅ 네이버 BSA 메인 : 정상", "✅ 네이버 BSA 썸네일1 : 정상", "✅ 네이버 BSA 썸네일2 : 정상", "✅ 네이버 BSA 썸네일3 : 정상"])
