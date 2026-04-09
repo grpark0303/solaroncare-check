@@ -22,23 +22,10 @@ def run_automation():
     options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
     
     driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
-    wait = WebDriverWait(driver, 40) 
+    wait = WebDriverWait(driver, 40) # 인내심 끝판왕 40초
     
     report_details = []
     total_status = "정상"
-
-    def force_click(xpath):
-        """요소가 나타나고, 클릭이 실제로 먹힐 때까지 반복하는 필살기"""
-        end_time = time.time() + 30
-        while time.time() < end_time:
-            try:
-                el = driver.find_element(By.XPATH, xpath)
-                driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", el)
-                driver.execute_script("arguments[0].click();", el)
-                return True
-            except:
-                time.sleep(0.5)
-        return False
 
     try:
         user_id = os.environ.get('EMAIL_ID')
@@ -57,22 +44,25 @@ def run_automation():
         driver.get("https://solaroncare.com/oncarehome/oncare?tab=%EC%84%9C%EB%B9%84%EC%8A%A4+%EC%86%8C%EA%B0%9C")
         
         try:
-            # 1) 상담 예약하기 (강제 클릭 루프)
-            if not force_click("//*[contains(text(), '상담 예약')]"):
-                raise Exception("상담 예약 버튼 클릭 실패")
+            # 1) 상담 예약하기
+            btn1 = wait.until(EC.element_to_be_clickable((By.XPATH, "//*[contains(text(), '상담 예약')]")))
+            driver.execute_script("arguments[0].click();", btn1)
             
-            # 2) 보유 네 버튼 (강제 클릭 루프)
-            if not force_click("//*[contains(text(), '네') and contains(text(), '보유')]"):
-                raise Exception("보유 버튼 클릭 실패")
+            # 2) [여기가 승부처] 팝업창이 나타날 때까지 대기 (최대 30초)
+            # 텍스트 매칭 대신, '보유'라는 글자를 포함한 버튼이 '보일 때'까지 대기
+            target_btn = wait.until(EC.visibility_of_element_located((By.XPATH, "//button[contains(., '보유') and contains(., '네')] | //*[contains(text(), '네') and contains(text(), '보유')]")))
             
-            # 3) 필수 동의 체크 (강제 클릭 루프)
-            if not force_click("//*[contains(text(), '필수') and not(contains(text(), '전체'))]"):
-                raise Exception("필수 동의 클릭 실패")
+            # 찾았으면 확실하게 JS로 클릭
+            driver.execute_script("arguments[0].click();", target_btn)
+            time.sleep(5)
+            
+            # 3) 필수 동의 체크
+            agree_el = wait.until(EC.element_to_be_clickable((By.XPATH, "//*[contains(text(), '필수') and not(contains(text(), '전체'))]")))
+            driver.execute_script("arguments[0].click();", agree_el)
+            time.sleep(3)
             
             # 4) 최종 예약하기 제출
-            # 버튼이 여러 개일 수 있으므로 마지막 버튼 조준
-            time.sleep(2)
-            submit_btns = driver.find_elements(By.XPATH, "//button[contains(., '예약하기')] | //*[text()='예약하기']")
+            submit_btns = wait.until(EC.presence_of_all_elements_located((By.XPATH, "//button[contains(., '예약하기')] | //*[text()='예약하기']")))
             driver.execute_script("arguments[0].click();", submit_btns[-1])
             
             time.sleep(15)
@@ -83,7 +73,8 @@ def run_automation():
                 total_status = "오류발생"
 
         except Exception as e:
-            report_details.append(f"❌ 상담 예약 신청 : 실패({str(e)})")
+            # 상세 에러 기록
+            report_details.append(f"❌ 상담 예약 신청 : 실패({type(e).__name__})")
             total_status = "오류발생"
 
         # 3. 자사 페이지 점검
@@ -112,7 +103,7 @@ def run_automation():
         send_to_google_form(total_status, "\n".join(report_details))
 
 def send_to_google_form(status, detail):
-    form_url = "https://docs.google.com/forms/d/e/1FAIpQLSdF9Q5waHP_dlPK35TonomQxbqph6SIYAoNa9FgXxjd8AJstw/formResponse"
+    form_url = "https://docs.google.com/forms/e/1FAIpQLSdF9Q5waHP_dlPK35TonomQxbqph6SIYAoNa9FgXxjd8AJstw/formResponse"
     payload = {"entry.1608092729": datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
                "entry.1702029548": status, "entry.1759228838": detail}
     requests.post(form_url, data=payload, timeout=10)
