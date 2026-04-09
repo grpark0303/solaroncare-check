@@ -11,6 +11,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.common.action_chains import ActionChains
 
 def run_automation():
     options = Options()
@@ -57,15 +58,20 @@ def run_automation():
             step = "상담 예약하기 클릭"
             res_btn = wait.until(EC.presence_of_element_located((By.XPATH, "//*[contains(text(), '상담 예약')] | //button[contains(., '예약')]")))
             driver.execute_script("arguments[0].click();", res_btn)
-            time.sleep(7) # 팝업이 뜨는 시간을 더 넉넉히 줍니다.
+            time.sleep(8) 
 
             step = "보유 네 버튼 클릭"
-            # [수정] 텍스트가 '네, 보유'로 시작하는 모든 요소를 찾아서 가장 첫 번째 것을 강제 클릭합니다.
-            # 버튼 태그뿐만 아니라 div, span 등 모든 요소를 뒤집니다.
-            yes_btn = wait.until(EC.presence_of_element_located((By.XPATH, "//*[contains(text(), '네, 보유')] | //*[contains(text(), '네,보유')]")))
-            driver.execute_script("arguments[0].scrollIntoView(true);", yes_btn) # 요소를 화면 중앙으로 가져옴
-            time.sleep(1)
-            driver.execute_script("arguments[0].click();", yes_btn)
+            # [최종병기] 텍스트 매칭이 안될 경우를 대비해 좌표 기반 클릭 시도
+            try:
+                # 1안: '네, 보유' 텍스트를 포함한 가장 바깥쪽 버튼 요소를 찾아 클릭
+                yes_btn = wait.until(EC.presence_of_element_located((By.XPATH, "//*[contains(text(), '네, 보유')]/ancestor::button | //*[contains(text(), '네, 보유')]")))
+                driver.execute_script("arguments[0].click();", yes_btn)
+            except:
+                # 2안: 화면 중앙(팝업 위치)을 직접 마우스로 클릭 (ActionChains 활용)
+                actions = ActionChains(driver)
+                # 1920x1080 기준 팝업창의 '네' 버튼 대략적 위치로 이동 후 클릭
+                actions.move_by_offset(960, 510).click().perform() 
+            
             time.sleep(5)
 
             step = "필수 동의 체크"
@@ -88,7 +94,7 @@ def run_automation():
             report_details.append(f"❌ 상담 예약 신청 : 실패({step} 단계)")
             total_status = "오류발생"
 
-        # 3. 자사 페이지 점검 (실제 이동)
+        # 3. 자사 페이지 점검
         pages = {
             "상세 페이지": "https://solaroncare.com/oncarehome/oncare?tab=%EC%84%9C%EB%B9%84%EC%8A%A4+%EC%86%8C%EA%B0%9C",
             "이벤트 페이지": "https://solaroncare.com/oncarehome/coupons",
