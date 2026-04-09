@@ -21,7 +21,7 @@ def run_automation():
     options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36")
     
     driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
-    wait = WebDriverWait(driver, 30) # 대기 시간을 30초로 넉넉하게
+    wait = WebDriverWait(driver, 30)
     report_details = []
     total_status = "정상"
 
@@ -31,33 +31,38 @@ def run_automation():
 
         # 1. 로그인 시도
         driver.get("https://solaroncare.com/oncarehome/login")
-        time.sleep(8) # 페이지가 뜰 때까지 충분히 기다림
+        time.sleep(10) # 넉넉한 로딩 시간
 
         try:
-            # [수정] 이름 대신 'input' 태그 자체를 찾아서 입력 (더 확실함)
-            inputs = driver.find_elements(By.TAG_NAME, "input")
-            if len(inputs) >= 2:
-                inputs[0].send_keys(user_id) # 첫 번째 칸에 아이디
-                inputs[1].send_keys(user_pw) # 두 번째 칸에 비번
-                
-                # 로그인 버튼도 텍스트가 아닌 'submit' 타입으로 찾기
-                login_btn = driver.find_element(By.XPATH, "//button[@type='submit'] | //button[contains(., '로그인')]")
-                driver.execute_script("arguments[0].click();", login_btn)
-                print(">>> 로그인 시도 성공")
-                time.sleep(8)
-            else:
-                raise Exception("입력창을 찾을 수 없음")
+            # 이메일 입력창: 속성값을 더 포괄적으로 검색
+            email_input = wait.until(EC.presence_of_element_located((By.XPATH, "//input[@type='email'] | //input[contains(@placeholder, '이메일')] | //input[@name='email']")))
+            
+            # 일반적인 send_keys가 안 통할 경우를 대비해 JS로 강제 값 주입
+            driver.execute_script("arguments[0].value = '';", email_input)
+            email_input.send_keys(user_id)
+            
+            # 비밀번호 입력창
+            pw_input = driver.find_element(By.XPATH, "//input[@type='password'] | //input[contains(@placeholder, '비밀번호')]")
+            driver.execute_script("arguments[0].value = '';", pw_input)
+            pw_input.send_keys(user_pw)
+            
+            # 로그인 버튼: '로그인' 텍스트를 가진 버튼을 더 정확히 타겟팅
+            login_btn = driver.find_element(By.XPATH, "//button[./span[contains(text(), '로그인')]] | //button[contains(text(), '로그인')] | //button[@type='submit']")
+            driver.execute_script("arguments[0].click();", login_btn)
+            
+            print(">>> 로그인 시도 (JS 주입 방식)")
+            time.sleep(10) # 로그인 후 전환 대기
         except Exception as e:
-            report_details.append(f"❌ 로그인 단계 오류: 입력창 미발견")
+            report_details.append(f"❌ 로그인 단계 오류: {str(e)[:30]}")
             total_status = "오류발생"
 
-        # 2. 예약 신청 시도
+        # 2. 예약 신청 시도 (로그인 성공 여부와 상관없이 시도는 함)
         driver.get("https://solaroncare.com/oncarehome/oncare?tab=%EC%84%9C%EB%B9%84%EC%8A%A4+%EC%86%8C%EA%B0%9C")
-        time.sleep(5)
+        time.sleep(7)
 
         try:
-            # [상담 예약하기] 클릭 (모든 버튼 중 '예약' 글자 포함된 것 찾기)
-            res_btn = wait.until(EC.presence_of_element_located((By.XPATH, "//button[contains(., '예약')]")))
+            # [상담 예약하기] 클릭
+            res_btn = wait.until(EC.presence_of_element_located((By.XPATH, "//button[contains(., '상담 예약하기')] | //button[contains(., '예약')]")))
             driver.execute_script("arguments[0].click();", res_btn)
             time.sleep(3)
 
@@ -76,12 +81,12 @@ def run_automation():
             total_status = "오류발생"
 
         # 3. 자사 페이지 실제 검증
-        check_pages = {
+        pages = {
             "상세 페이지": "https://solaroncare.com/oncarehome/oncare?tab=%EC%84%9C%EB%B9%84%EC%8A%A4+%EC%86%8C%EA%B0%9C",
             "이벤트 페이지": "https://solaroncare.com/oncarehome/coupons",
             "콘텐츠 페이지": "https://solaroncare.com/oncarehome/contents"
         }
-        for name, url in check_pages.items():
+        for name, url in pages.items():
             try:
                 driver.get(url)
                 time.sleep(3)
