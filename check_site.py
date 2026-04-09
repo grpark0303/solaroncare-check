@@ -32,20 +32,6 @@ def run_automation():
     report_details = []
     total_status = "정상"
 
-    def smart_click(xpath, timeout=30):
-        """요소가 나타날 때까지 1초마다 확인하며 클릭 시도"""
-        start_time = time.time()
-        while time.time() - start_time < timeout:
-            try:
-                el = driver.find_element(By.XPATH, xpath)
-                driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", el)
-                time.sleep(1)
-                driver.execute_script("arguments[0].click();", el)
-                return True
-            except:
-                time.sleep(1)
-        return False
-
     try:
         user_id = os.environ.get('EMAIL_ID')
         user_pw = os.environ.get('EMAIL_PW')
@@ -63,32 +49,49 @@ def run_automation():
         driver.get("https://solaroncare.com/oncarehome/oncare?tab=%EC%84%9C%EB%B9%84%EC%8A%A4+%EC%86%8C%EA%B0%9C")
         time.sleep(15)
 
-        # [단계별 정밀 타격]
+        # [단계별 강제 집행]
         # 1) 상담 예약하기
-        if not smart_click("//*[contains(text(), '상담 예약')]"):
-            raise Exception("상담예약하기 버튼 미발견")
+        try:
+            btn1 = driver.find_element(By.XPATH, "//*[contains(text(), '상담 예약')]")
+            driver.execute_script("arguments[0].click();", btn1)
+        except:
+            raise Exception("상담예약 버튼 클릭 실패")
         time.sleep(10)
 
-        # 2) 보유 네 버튼
-        if not smart_click("//*[normalize-space()='네, 보유하고 있습니다.(준공 및 인허가 단계 포함)'] | //*[contains(text(), '네, 보유')]"):
-            raise Exception("보유 네 버튼 미발견")
-        time.sleep(5)
+        # 2) 보유 네 버튼 (글자 매칭 안 하고 모달 안의 첫 버튼 클릭)
+        try:
+            # 화면에 뜬 '모달' 또는 '팝업' 레이어 안의 모든 버튼을 긁어옴
+            modal_btns = driver.find_elements(By.XPATH, "//div[contains(@class, 'modal')]//button | //div[contains(@class, 'popup')]//button | //button[contains(., '보유')]")
+            # 가람님 캡처상 첫 번째 버튼이 무조건 '네' 버튼이므로 0번 인덱스 타격
+            driver.execute_script("arguments[0].click();", modal_btns[0])
+        except:
+            raise Exception("보유 네 버튼 강제 클릭 실패")
+        time.sleep(7)
 
         # 3) 필수 동의 체크
-        if not smart_click("//*[contains(text(), '필수') and not(contains(text(), '전체'))]"):
-            raise Exception("필수동의 체크 미발견")
-        time.sleep(3)
+        try:
+            agree_el = driver.find_element(By.XPATH, "//*[contains(text(), '필수') and not(contains(text(), '전체'))]")
+            driver.execute_script("""
+                var cb = arguments[0].closest('div').querySelector('input');
+                if(cb) { cb.checked = true; cb.click(); } else { arguments[0].click(); }
+            """, agree_el)
+        except:
+            raise Exception("필수동의 체크 실패")
+        time.sleep(5)
 
         # 4) 최종 예약하기 제출
-        if not smart_click("//button[contains(., '예약하기')] | //*[text()='예약하기']"):
-            raise Exception("최종 예약하기 버튼 미발견")
+        try:
+            final_btns = driver.find_elements(By.XPATH, "//button[contains(., '예약하기')] | //*[text()='예약하기']")
+            driver.execute_script("arguments[0].click();", final_btns[-1])
+        except:
+            raise Exception("최종 예약 버튼 클릭 실패")
         time.sleep(15)
 
         # 최종 확인
         if "/result" in driver.current_url.lower():
             report_details.append("✅ 상담 예약 신청 : 완료")
         else:
-            report_details.append(f"❌ 상담 예약 신청 : 실패(결과페이지 미도달 - {driver.current_url})")
+            report_details.append(f"❌ 상담 예약 신청 : 실패(최종 페이지 미도달)")
             total_status = "오류발생"
 
     except Exception as e:
@@ -102,7 +105,7 @@ def run_automation():
     for name, url in pages.items():
         try:
             driver.get(url)
-            time.sleep(8)
+            time.sleep(5)
             report_details.append(f"✅ {name} : 정상")
         except:
             report_details.append(f"❌ {name} : 오류")
