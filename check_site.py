@@ -29,7 +29,6 @@ def run_automation():
         "source": "Object.defineProperty(navigator, 'webdriver', {get: () => false})"
     })
 
-    # 전체적인 대기 시간을 60초로 상향 조정 (네트워크 불안정 대비)
     wait = WebDriverWait(driver, 60)
     report_details = []
     total_status = "정상"
@@ -47,7 +46,7 @@ def run_automation():
         driver.execute_script("arguments[0].value = arguments[1];", inputs[0], user_id)
         driver.execute_script("arguments[0].value = arguments[1];", inputs[1], user_pw)
         inputs[1].send_keys(Keys.ENTER)
-        time.sleep(20) # 로그인 후 메인 전환 대기 대폭 강화
+        time.sleep(20) 
 
         # 2. 예약 신청
         step = "예약 페이지 접속"
@@ -55,23 +54,20 @@ def run_automation():
         time.sleep(15)
 
         try:
-            # 1) 상담 예약하기 (더 꼼꼼하게 찾기)
+            # 1) 상담 예약하기
             step = "상담 예약하기 클릭"
-            # '상담 예약하기' 텍스트를 가진 요소를 최대 60초간 기다림
-            btn1 = wait.until(EC.element_to_be_clickable((By.XPATH, "//*[normalize-space()='상담 예약하기']")))
-            driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", btn1)
-            time.sleep(2)
+            btn1 = wait.until(EC.element_to_be_clickable((By.XPATH, "//*[contains(text(), '상담 예약')]")))
             driver.execute_script("arguments[0].click();", btn1)
-            time.sleep(10)
+            time.sleep(12) # 팝업 로딩 충분히 대기
 
-            # 2) 보유 네 버튼 (정밀 타격)
+            # 2) 보유 네 버튼 (전략 변경: 팝업 내 첫 번째 버튼 강제 클릭)
             step = "보유 네 버튼 클릭"
-            exact_text = "네, 보유하고 있습니다.(준공 및 인허가 단계 포함)"
-            target_btn = wait.until(EC.presence_of_element_located((By.XPATH, f"//*[normalize-space()='{exact_text}']")))
-            driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", target_btn)
-            time.sleep(2)
-            driver.execute_script("arguments[0].click();", target_btn)
-            time.sleep(7)
+            # [수정] 텍스트 전체 일치 대신, 팝업창 내에서 '보유'라는 글자를 포함한 요소를 찾습니다.
+            pop_btn = wait.until(EC.presence_of_element_located((By.XPATH, "//*[contains(@class, 'modal') or contains(@class, 'popup')]//button[contains(., '보유')] | //button[contains(., '네, 보유')] | //*[contains(text(), '네, 보유')]")))
+            driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", pop_btn)
+            time.sleep(3)
+            driver.execute_script("arguments[0].click();", pop_btn)
+            time.sleep(8)
 
             # 3) 필수 동의 체크
             step = "필수 동의 체크"
@@ -87,7 +83,7 @@ def run_automation():
 
             # 4) 최종 예약하기 제출
             step = "최종 예약하기 제출"
-            final_btns = driver.find_elements(By.XPATH, "//*[text()='예약하기' or contains(text(), '예약하기')]")
+            final_btns = driver.find_elements(By.XPATH, "//button[contains(., '예약하기')] | //*[text()='예약하기']")
             final_btn = final_btns[-1]
             driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", final_btn)
             time.sleep(3)
@@ -111,7 +107,7 @@ def run_automation():
                  "콘텐츠 페이지": "https://solaroncare.com/oncarehome/contents"}
         for name, url in pages.items():
             driver.get(url)
-            time.sleep(7)
+            time.sleep(8)
             report_details.append(f"✅ {name} : 정상")
 
         report_details.extend(["✅ 네이버 BSA 메인 : 정상", "✅ 네이버 BSA 썸네일1 : 정상", "✅ 네이버 BSA 썸네일2 : 정상", "✅ 네이버 BSA 썸네일3 : 정상"])
