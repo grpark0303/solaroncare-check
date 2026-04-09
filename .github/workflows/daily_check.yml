@@ -16,8 +16,8 @@ jobs:
       - name: Install dependencies
         run: |
           pip install -r requirements.txt
-      - name: Run script
+- name: Run script
         env:
-          KAKAO_ID: ${{ secrets.KAKAO_ID }}
-          KAKAO_PW: ${{ secrets.KAKAO_PW }}
+          EMAIL_ID: ${{ secrets.EMAIL_ID }}
+          EMAIL_PW: ${{ secrets.EMAIL_PW }}
         run: python check_site.py
