@@ -113,4 +113,7 @@ def send_to_google_form(status, detail):
     form_url = "https://docs.google.com/forms/d/e/1FAIpQLSdF9Q5waHP_dlPK35TonomQxbqph6SIYAoNa9FgXxjd8AJstw/formResponse"
     payload = {"entry.1608092729": datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
                "entry.1702029548": status, "entry.1759228838": detail}
-    requests.post(form
+    requests.post(form_url, data=payload, timeout=10)
+
+if __name__ == "__main__":
+    run_automation()
