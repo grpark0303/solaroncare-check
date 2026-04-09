@@ -55,26 +55,28 @@ def run_automation():
 
         try:
             step = "상담 예약하기 클릭"
-            res_btn = wait.until(EC.presence_of_element_located((By.XPATH, "//button[contains(., '예약')] | //*[contains(text(), '상담 예약')]")))
+            res_btn = wait.until(EC.presence_of_element_located((By.XPATH, "//*[contains(text(), '상담 예약')] | //button[contains(., '예약')]")))
             driver.execute_script("arguments[0].click();", res_btn)
-            time.sleep(5)
+            time.sleep(7) # 팝업이 뜨는 시간을 더 넉넉히 줍니다.
 
             step = "보유 네 버튼 클릭"
-            # [수정] 글자 매칭 대신, 팝업(Modal) 내의 첫 번째 버튼을 직접 타겟팅
-            # 이미지상 '네' 버튼이 항상 첫 번째이므로 index[0]을 사용합니다.
-            yes_buttons = wait.until(EC.presence_of_all_elements_located((By.XPATH, "//div[contains(@class, 'modal')]//button | //div[role='dialog']//button | //button[contains(., '네')]")))
-            driver.execute_script("arguments[0].click();", yes_buttons[0])
-            time.sleep(3)
+            # [수정] 텍스트가 '네, 보유'로 시작하는 모든 요소를 찾아서 가장 첫 번째 것을 강제 클릭합니다.
+            # 버튼 태그뿐만 아니라 div, span 등 모든 요소를 뒤집니다.
+            yes_btn = wait.until(EC.presence_of_element_located((By.XPATH, "//*[contains(text(), '네, 보유')] | //*[contains(text(), '네,보유')]")))
+            driver.execute_script("arguments[0].scrollIntoView(true);", yes_btn) # 요소를 화면 중앙으로 가져옴
+            time.sleep(1)
+            driver.execute_script("arguments[0].click();", yes_btn)
+            time.sleep(5)
 
             step = "필수 동의 체크"
             agree = wait.until(EC.presence_of_element_located((By.XPATH, "//*[contains(text(), '개인정보') and contains(text(), '필수') and not(contains(text(), '전체'))]")))
             driver.execute_script("arguments[0].click();", agree)
-            time.sleep(2)
+            time.sleep(3)
 
             step = "최종 예약하기 제출"
             final_submit = wait.until(EC.element_to_be_clickable((By.XPATH, "//button[contains(., '예약하기')]")))
             driver.execute_script("arguments[0].click();", final_submit)
-            time.sleep(10)
+            time.sleep(12)
 
             if "/oncare/result" in driver.current_url:
                 report_details.append("✅ 상담 예약 신청 : 완료")
@@ -86,7 +88,7 @@ def run_automation():
             report_details.append(f"❌ 상담 예약 신청 : 실패({step} 단계)")
             total_status = "오류발생"
 
-        # 3. 자사 페이지 점검
+        # 3. 자사 페이지 점검 (실제 이동)
         pages = {
             "상세 페이지": "https://solaroncare.com/oncarehome/oncare?tab=%EC%84%9C%EB%B9%84%EC%8A%A4+%EC%86%8C%EA%B0%9C",
             "이벤트 페이지": "https://solaroncare.com/oncarehome/coupons",
