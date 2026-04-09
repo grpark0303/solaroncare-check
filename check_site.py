@@ -47,24 +47,25 @@ def run_automation():
         driver.execute_script("arguments[0].click();", btn1)
         time.sleep(12) 
 
-        # 2) [핵심 수정] '네'로 시작하는 버튼만 정확히 타격
-        found = False
-        # 모든 버튼, div, span 요소를 뒤짐
-        targets = driver.find_elements(By.XPATH, "//button | //div[@role='button'] | //span")
-        for t in targets:
-            txt = t.text.strip()
-            # '아니오'는 버리고, '네'로 시작하면서 '보유'가 들어있는 버튼만 선택
-            if txt.startswith("네") and "보유" in txt:
-                driver.execute_script("arguments[0].click();", t)
-                found = True
-                break
-        
-        if not found:
-            raise Exception("정확한 '네, 보유...' 버튼을 찾지 못함")
+        # 2) [최종 수정] 텍스트 매칭 안 함. 팝업 내 '첫 번째' 버튼만 타격
+        # 이미지상 '네, 보유...' 버튼은 항상 상단(첫 번째)에 위치함
+        try:
+            # 팝업(모달) 영역 내에 있는 모든 버튼을 긁어옴
+            pop_btns = driver.find_elements(By.XPATH, "//div[contains(@class, 'modal')]//button | //div[contains(@class, 'popup')]//button | //button[contains(., '보유')]")
+            
+            if not pop_btns:
+                # 만약 위 조건으로 안 잡히면 페이지 내 모든 버튼 중 '보유' 글자가 있는 것들 수집
+                pop_btns = [b for b in driver.find_elements(By.TAG_NAME, "button") if "보유" in b.text]
+
+            # 리스트의 첫 번째(index 0) 버튼이 "네, 보유..." 버튼임
+            driver.execute_script("arguments[0].click();", pop_btns[0])
+            print(">>> 팝업 첫 번째 버튼 클릭 완료")
+        except Exception as e:
+            raise Exception(f"보유 버튼 순서 클릭 실패: {str(e)}")
         
         time.sleep(8)
 
-        # 3) 필수 동의 체크 (전체동의 제외)
+        # 3) 필수 동의 체크
         agrees = driver.find_elements(By.XPATH, "//*[contains(text(), '필수')]")
         for a in agrees:
             if "전체" not in a.text:
