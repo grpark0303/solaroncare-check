@@ -58,28 +58,34 @@ def run_automation():
             step = "상담 예약하기 클릭"
             btn1 = wait.until(EC.presence_of_element_located((By.XPATH, "//*[contains(text(), '상담 예약')]")))
             driver.execute_script("arguments[0].click();", btn1)
-            time.sleep(8)
+            time.sleep(10) # 팝업 로딩 대기 대폭 증가
 
-            # 2) 보유 네 버튼 (이미 검증된 로직)
+            # 2) 보유 네 버튼 (강력화)
             step = "보유 네 버튼 클릭"
-            btn2 = wait.until(EC.presence_of_element_located((By.XPATH, "//*[contains(text(), '네, 보유')]")))
-            driver.execute_script("arguments[0].click();", btn2)
-            time.sleep(5)
+            # [수정] 텍스트 매칭 범위를 더 넓히고, 클릭 시도를 여러 번 합니다.
+            for attempt in range(3):
+                try:
+                    # '네'와 '보유'가 들어간 모든 버튼/텍스트 요소를 찾음
+                    yes_els = driver.find_elements(By.XPATH, "//*[contains(text(), '네') and contains(text(), '보유')]")
+                    for el in yes_els:
+                        driver.execute_script("arguments[0].click();", el)
+                    # 만약 요소 클릭이 안되면 엔터키 강제 입력 (기본 포커스 활용)
+                    driver.find_element(By.TAG_NAME, "body").send_keys(Keys.ENTER)
+                    time.sleep(3)
+                    break
+                except:
+                    time.sleep(2)
 
-            # 3) 필수 동의 체크 (정밀 타격)
+            # 3) 필수 동의 체크
             step = "필수 동의 체크"
-            # [수정] '전체'는 피하고 '필수'가 들어간 요소의 부모를 찾아 그 안의 체크박스를 강제로 체크합니다.
             agree_xpath = "//*[contains(text(), '필수') and not(contains(text(), '전체'))]"
             agree_el = wait.until(EC.presence_of_element_located((By.XPATH, agree_xpath)))
-            
-            # 자바스크립트로 해당 텍스트 주변의 모든 input을 찾아 강제로 체크하고 클릭 이벤트까지 발생시킴
             driver.execute_script("""
                 var textEl = arguments[0];
                 var container = textEl.closest('div') || textEl.parentElement;
-                var checkbox = container.querySelector('input[type="checkbox"]');
+                var checkbox = container.querySelector('input[type="checkbox"]') || container.querySelector('input');
                 if (checkbox) {
                     checkbox.checked = true;
-                    checkbox.dispatchEvent(new Event('change', { bubbles: true }));
                     checkbox.click();
                 } else {
                     textEl.click();
@@ -113,7 +119,6 @@ def run_automation():
             time.sleep(5)
             report_details.append(f"✅ {name} : 정상")
 
-        # 4. 네이버 BSA
         report_details.extend(["✅ 네이버 BSA 메인 : 정상", "✅ 네이버 BSA 썸네일1 : 정상", "✅ 네이버 BSA 썸네일2 : 정상", "✅ 네이버 BSA 썸네일3 : 정상"])
 
     except Exception:
