@@ -61,26 +61,29 @@ def run_automation():
             time.sleep(8) 
 
             step = "보유 네 버튼 클릭"
-            # [최종병기] 텍스트 매칭이 안될 경우를 대비해 좌표 기반 클릭 시도
-            try:
-                # 1안: '네, 보유' 텍스트를 포함한 가장 바깥쪽 버튼 요소를 찾아 클릭
-                yes_btn = wait.until(EC.presence_of_element_located((By.XPATH, "//*[contains(text(), '네, 보유')]/ancestor::button | //*[contains(text(), '네, 보유')]")))
-                driver.execute_script("arguments[0].click();", yes_btn)
-            except:
-                # 2안: 화면 중앙(팝업 위치)을 직접 마우스로 클릭 (ActionChains 활용)
-                actions = ActionChains(driver)
-                # 1920x1080 기준 팝업창의 '네' 버튼 대략적 위치로 이동 후 클릭
-                actions.move_by_offset(960, 510).click().perform() 
-            
+            yes_btn = wait.until(EC.presence_of_element_located((By.XPATH, "//*[contains(text(), '네, 보유')]/ancestor::button | //*[contains(text(), '네, 보유')]")))
+            driver.execute_script("arguments[0].click();", yes_btn)
             time.sleep(5)
 
             step = "필수 동의 체크"
-            agree = wait.until(EC.presence_of_element_located((By.XPATH, "//*[contains(text(), '개인정보') and contains(text(), '필수') and not(contains(text(), '전체'))]")))
-            driver.execute_script("arguments[0].click();", agree)
+            # [핵심수정] '전체'를 제외하고 '개인정보'와 '필수'가 포함된 영역의 실제 체크박스(input)를 찾아 강제로 true로 만듭니다.
+            # 텍스트 클릭이 안 먹힐 경우를 대비해 input 태그를 직접 조준합니다.
+            agree_xpath = "//*[contains(text(), '개인정보') and contains(text(), '필수') and not(contains(text(), '전체'))]"
+            agree_element = wait.until(EC.presence_of_element_located((By.XPATH, agree_xpath)))
+            
+            # 해당 요소 주변의 input 태그를 찾아 체크 상태로 변경
+            try:
+                checkbox = agree_element.find_element(By.XPATH, ".//preceding-sibling::input | ..//input | .//input")
+                driver.execute_script("arguments[0].checked = true; arguments[0].dispatchEvent(new Event('change'));", checkbox)
+            except:
+                # input을 못 찾으면 텍스트 영역이라도 강제 클릭
+                driver.execute_script("arguments[0].click();", agree_element)
+            
             time.sleep(3)
 
             step = "최종 예약하기 제출"
-            final_submit = wait.until(EC.element_to_be_clickable((By.XPATH, "//button[contains(., '예약하기')]")))
+            # [이미지 9]의 하단 '예약하기' 버튼을 정확히 조준
+            final_submit = wait.until(EC.element_to_be_clickable((By.XPATH, "//button[text()='예약하기'] | //button[contains(., '예약하기')]")))
             driver.execute_script("arguments[0].click();", final_submit)
             time.sleep(12)
 
