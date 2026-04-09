@@ -7,7 +7,6 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.common.by import By
-from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.common.keys import Keys
 
 def run_automation():
@@ -15,7 +14,7 @@ def run_automation():
     options.add_argument('--headless')
     options.add_argument('--no-sandbox')
     options.add_argument('--disable-dev-shm-usage')
-    options.add_argument('--window-size=1920,1080') # 팝업 위치 고정을 위해 창 크기 고정
+    options.add_argument('--window-size=1920,1080')
     options.add_argument('--lang=ko-KR')
     options.add_argument("--disable-blink-features=AutomationControlled")
     options.add_experimental_option("excludeSwitches", ["enable-automation"])
@@ -43,50 +42,39 @@ def run_automation():
         driver.get("https://solaroncare.com/oncarehome/oncare?tab=%EC%84%9C%EB%B9%84%EC%8A%A4+%EC%86%8C%EA%B0%9C")
         time.sleep(15)
 
-        # [단계별 강제 집행]
-        # 1) 상담 예약하기 버튼 클릭 (텍스트 기반)
-        try:
-            btn1 = driver.find_element(By.XPATH, "//*[contains(text(), '상담 예약')]")
-            driver.execute_script("arguments[0].click();", btn1)
-        except:
-            raise Exception("상담예약 버튼 클릭 실패")
-        
-        time.sleep(10) # 팝업 로딩 대기
+        # 1) 상담 예약하기 클릭
+        btn1 = driver.find_element(By.XPATH, "//*[contains(text(), '상담 예약')]")
+        driver.execute_script("arguments[0].click();", btn1)
+        time.sleep(12) 
 
-        # 2) [핵심] 보유 네 버튼 - 좌표 광클 (화면 정중앙 부근 타격)
-        try:
-            actions = ActionChains(driver)
-            # 1920x1080 창 크기 기준, 이미지상의 '네' 버튼 대략적 좌표 (960, 520)
-            # 버튼이 살짝 위아래로 움직일 수 있으므로 주변을 5번 연속 클릭
-            for i in range(5):
-                actions.move_to_location(960, 510 + (i*5)).click().perform()
-                time.sleep(0.5)
-        except:
-            raise Exception("보유 버튼 좌표 클릭 실패")
+        # 2) [핵심 수정] '네'로 시작하는 버튼만 정확히 타격
+        found = False
+        # 모든 버튼, div, span 요소를 뒤짐
+        targets = driver.find_elements(By.XPATH, "//button | //div[@role='button'] | //span")
+        for t in targets:
+            txt = t.text.strip()
+            # '아니오'는 버리고, '네'로 시작하면서 '보유'가 들어있는 버튼만 선택
+            if txt.startswith("네") and "보유" in txt:
+                driver.execute_script("arguments[0].click();", t)
+                found = True
+                break
         
-        time.sleep(7)
+        if not found:
+            raise Exception("정확한 '네, 보유...' 버튼을 찾지 못함")
+        
+        time.sleep(8)
 
-        # 3) 필수 동의 체크 (성공했던 로직 유지)
-        try:
-            agree_el = driver.find_element(By.XPATH, "//*[contains(text(), '필수') and not(contains(text(), '전체'))]")
-            driver.execute_script("""
-                var div = arguments[0].closest('div');
-                var cb = div.querySelector('input') || div.querySelector('span');
-                cb.click();
-            """, agree_el)
-        except:
-            # 글자라도 클릭 시도
-            driver.execute_script("arguments[0].click();", agree_el)
-        
+        # 3) 필수 동의 체크 (전체동의 제외)
+        agrees = driver.find_elements(By.XPATH, "//*[contains(text(), '필수')]")
+        for a in agrees:
+            if "전체" not in a.text:
+                driver.execute_script("arguments[0].click();", a)
+                break
         time.sleep(5)
 
         # 4) 최종 예약하기 제출
-        try:
-            final_btns = driver.find_elements(By.XPATH, "//button[contains(., '예약하기')] | //*[text()='예약하기']")
-            driver.execute_script("arguments[0].click();", final_btns[-1])
-        except:
-            raise Exception("최종 예약 버튼 클릭 실패")
-        
+        submit_btns = driver.find_elements(By.XPATH, "//button[contains(., '예약하기')] | //*[text()='예약하기']")
+        driver.execute_script("arguments[0].click();", submit_btns[-1])
         time.sleep(15)
 
         # 최종 확인
@@ -100,7 +88,7 @@ def run_automation():
         report_details.append(f"❌ 상담 예약 신청 : 실패({str(e)})")
         total_status = "오류발생"
 
-    # 3. 자사 페이지 점검 (생략 방지)
+    # 3. 자사 페이지 점검
     pages = {"상세 페이지": "https://solaroncare.com/oncarehome/oncare?tab=%EC%84%9C%EB%B9%84%EC%8A%A4+%EC%86%8C%EA%B0%9C",
              "이벤트 페이지": "https://solaroncare.com/oncarehome/coupons",
              "콘텐츠 페이지": "https://solaroncare.com/oncarehome/contents"}
