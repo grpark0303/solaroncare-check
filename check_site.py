@@ -45,35 +45,17 @@ def run_automation():
         # 1) 상담 예약하기 클릭
         btn1 = driver.find_element(By.XPATH, "//*[contains(text(), '상담 예약')]")
         driver.execute_script("arguments[0].click();", btn1)
-        time.sleep(10) 
+        time.sleep(12) 
 
-        # 2) [재시도 강화] 보유 네 버튼 클릭
-        clicked = False
-        for i in range(10): # 최대 10번 재시도 (약 20초)
-            try:
-                # 모든 버튼, div 중 '보유'가 포함된 요소를 싹 긁어옴
-                pop_btns = [b for b in driver.find_elements(By.XPATH, "//button | //div[@role='button'] | //span") if "보유" in b.text]
-                
-                # '아니오'와 구분하기 위해 '네'가 포함된 첫 번째 요소를 타겟
-                target = [b for b in pop_btns if "네" in b.text][0]
-                
-                driver.execute_script("arguments[0].click();", target)
-                clicked = True
-                break
-            except:
-                time.sleep(2) # 2초 쉬고 다시 찾기
-        
-        if not clicked:
-            raise Exception("보유 버튼 발견 실패 (10회 재시도 초과)")
-        
+        # 2) [복구] 보유 네 버튼 - 가장 잘 작동했던 '텍스트 포함' 방식
+        # '아니오'와 섞이지 않게 '네'와 '보유'가 모두 들어간 요소 클릭
+        btn2 = driver.find_element(By.XPATH, "//*[contains(text(), '네') and contains(text(), '보유')]")
+        driver.execute_script("arguments[0].click();", btn2)
         time.sleep(8)
 
         # 3) 필수 동의 체크
-        agrees = driver.find_elements(By.XPATH, "//*[contains(text(), '필수')]")
-        for a in agrees:
-            if "전체" not in a.text:
-                driver.execute_script("arguments[0].click();", a)
-                break
+        agree_el = driver.find_element(By.XPATH, "//*[contains(text(), '필수') and not(contains(text(), '전체'))]")
+        driver.execute_script("arguments[0].click();", agree_el)
         time.sleep(5)
 
         # 4) 최종 예약하기 제출
@@ -85,11 +67,11 @@ def run_automation():
         if "/result" in driver.current_url.lower():
             report_details.append("✅ 상담 예약 신청 : 완료")
         else:
-            report_details.append(f"❌ 상담 예약 신청 : 실패(결과페이지 미도달)")
+            report_details.append(f"❌ 상담 예약 신청 : 실패(최종 페이지 미도달)")
             total_status = "오류발생"
 
     except Exception as e:
-        report_details.append(f"❌ 상담 예약 신청 : 실패({str(e)})")
+        report_details.append(f"❌ 상담 예약 신청 : 실패({str(e)[:30]})")
         total_status = "오류발생"
 
     # 3. 자사 페이지 점검
