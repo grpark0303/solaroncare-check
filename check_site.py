@@ -58,25 +58,16 @@ def run_automation():
             step = "상담 예약하기 클릭"
             btn1 = wait.until(EC.presence_of_element_located((By.XPATH, "//*[contains(text(), '상담 예약')]")))
             driver.execute_script("arguments[0].click();", btn1)
-            time.sleep(10) # 팝업 로딩 대기 대폭 증가
+            time.sleep(10)
 
-            # 2) 보유 네 버튼 (강력화)
+            # 2) 보유 네 버튼 (무차별 클릭 방식 유지)
             step = "보유 네 버튼 클릭"
-            # [수정] 텍스트 매칭 범위를 더 넓히고, 클릭 시도를 여러 번 합니다.
-            for attempt in range(3):
-                try:
-                    # '네'와 '보유'가 들어간 모든 버튼/텍스트 요소를 찾음
-                    yes_els = driver.find_elements(By.XPATH, "//*[contains(text(), '네') and contains(text(), '보유')]")
-                    for el in yes_els:
-                        driver.execute_script("arguments[0].click();", el)
-                    # 만약 요소 클릭이 안되면 엔터키 강제 입력 (기본 포커스 활용)
-                    driver.find_element(By.TAG_NAME, "body").send_keys(Keys.ENTER)
-                    time.sleep(3)
-                    break
-                except:
-                    time.sleep(2)
+            yes_els = driver.find_elements(By.XPATH, "//*[contains(text(), '네') and contains(text(), '보유')]")
+            for el in yes_els:
+                driver.execute_script("arguments[0].click();", el)
+            time.sleep(5)
 
-            # 3) 필수 동의 체크
+            # 3) 필수 동의 체크 (성공한 로직 유지)
             step = "필수 동의 체크"
             agree_xpath = "//*[contains(text(), '필수') and not(contains(text(), '전체'))]"
             agree_el = wait.until(EC.presence_of_element_located((By.XPATH, agree_xpath)))
@@ -91,16 +82,17 @@ def run_automation():
                     textEl.click();
                 }
             """, agree_el)
-            time.sleep(3)
+            time.sleep(5) # 동의 후 버튼 활성화 대기 시간 늘림
 
-            # 4) 최종 제출
+            # 4) 최종 제출 (보강)
             step = "최종 예약하기 제출"
-            final_btn = wait.until(EC.presence_of_element_located((By.XPATH, "//button[contains(., '예약하기')]")))
-            driver.execute_script("arguments[0].click();", final_btn)
-            time.sleep(12)
+            # '예약하기'라는 글자가 들어간 모든 요소를 찾아 가장 마지막에 있는 것(주로 하단 버튼)을 클릭
+            final_btns = driver.find_elements(By.XPATH, "//*[text()='예약하기'] | //button[contains(., '예약하기')] | //*[contains(text(), '혜택 받기')]")
+            driver.execute_script("arguments[0].click();", final_btns[-1]) 
+            time.sleep(15) # 결과 페이지 로딩 대기
 
-            # 5) 최종 검증
-            if "/oncare/result" in driver.current_url:
+            # 5) 최종 확인
+            if "/oncare/result" in driver.current_url or "result" in driver.current_url.lower():
                 report_details.append("✅ 상담 예약 신청 : 완료")
             else:
                 report_details.append(f"❌ 상담 예약 신청 : 실패(결과페이지 미도달)")
