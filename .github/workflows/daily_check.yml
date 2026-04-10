@@ -1,5 +1,4 @@
 name: Daily Site Check
-
 on:
   schedule:
     - cron: '0 22 * * *'
