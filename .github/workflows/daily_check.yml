@@ -37,3 +37,10 @@ jobs:
         with:
           name: screenshots
           path: "*.png"
+      - name: Run script
+              env:
+                EMAIL_ID: ${{ secrets.EMAIL_ID }}
+                EMAIL_PW: ${{ secrets.EMAIL_PW }}
+                NAVER_EMAIL: ${{ secrets.NAVER_EMAIL }}
+                NAVER_PW: ${{ secrets.NAVER_PW }}
+              run: python check_site.py
