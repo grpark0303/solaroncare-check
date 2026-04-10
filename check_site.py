@@ -43,13 +43,15 @@ def get_auth_code(gmail_address, gmail_app_pw, timeout=90):
             mail.login(gmail_address, gmail_app_pw)
             mail.select("INBOX")
 
+            # 최신 메일 20개만 확인
             result, data = mail.search(None, "ALL")
             mail_ids = data[0].split()
 
-            for mail_id in reversed(mail_ids[-15:]):
+            for mail_id in reversed(mail_ids[-20:]):
                 result, msg_data = mail.fetch(mail_id, "(RFC822)")
                 msg = email.message_from_bytes(msg_data[0][1])
 
+                # 제목 디코딩
                 subject = ""
                 if msg["Subject"]:
                     decoded_parts = email.header.decode_header(msg["Subject"])
@@ -59,26 +61,30 @@ def get_auth_code(gmail_address, gmail_app_pw, timeout=90):
                         else:
                             subject += part
 
-                print(f"[IMAP] 메일 제목: {subject}")
+                print(f"[IMAP] 제목: {subject}")
 
-                clean_subj = subject.replace(" ", "")
-                if "솔라온케어" in clean_subj and "인증번호" in clean_subj:
+                # ✅ 정확한 제목으로 필터링
+                if "솔라온케어" in subject and "인증번호" in subject:
                     print("[IMAP] 인증 메일 발견!")
 
                     body = ""
                     if msg.is_multipart():
                         for part in msg.walk():
-                            if part.get_content_type() == "text/plain":
+                            content_type = part.get_content_type()
+                            if content_type == "text/plain":
                                 body = part.get_payload(decode=True).decode("utf-8", errors="ignore")
                                 break
-                            elif part.get_content_type() == "text/html":
+                            elif content_type == "text/html":
                                 body = part.get_payload(decode=True).decode("utf-8", errors="ignore")
                     else:
                         body = msg.get_payload(decode=True).decode("utf-8", errors="ignore")
 
+                    print(f"[IMAP] 메일 본문 일부: {body[:200]}")
+
+                    # 6자리 숫자 추출
                     codes = re.findall(r'\b\d{6}\b', body)
                     if codes:
-                        print(f"[IMAP] 인증번호: {codes[0]}")
+                        print(f"[IMAP] 인증번호 추출 성공: {codes[0]}")
                         mail.logout()
                         return codes[0]
 
@@ -178,7 +184,9 @@ def run_automation():
         if "login" in driver.current_url:
             print("[5] 2단계 인증 감지 → Gmail에서 인증번호 읽는 중")
             auth_code = get_auth_code(gmail_address, gmail_app_pw, timeout=90)
+            print(f"[5] 인증번호: {auth_code}")
 
+            # 인증번호 입력
             code_input = wait.until(EC.presence_of_element_located(
                 (By.CSS_SELECTOR, "input[placeholder*='인증번호']")
             ))
@@ -188,6 +196,15 @@ def run_automation():
             human_delay(1.0, 2.0)
             driver.save_screenshot("step4_auth_code_input.png")
 
+            # ✅ 확인 버튼 클릭
+            confirm_check_btn = wait.until(EC.presence_of_element_located(
+                (By.XPATH, "//button[contains(text(),'확인')]")
+            ))
+            click(driver, confirm_check_btn)
+            human_delay(2, 3)
+            driver.save_screenshot("step4_after_confirm.png")
+
+            # 인증 완료하기 버튼 클릭
             confirm_btn = wait.until(EC.presence_of_element_located(
                 (By.XPATH, "//*[contains(text(),'인증 완료하기')]")
             ))
