@@ -1,4 +1,5 @@
 name: Daily Site Check
+
 on:
   schedule:
     - cron: '0 22 * * *'
@@ -29,6 +30,8 @@ jobs:
         env:
           EMAIL_ID: ${{ secrets.EMAIL_ID }}
           EMAIL_PW: ${{ secrets.EMAIL_PW }}
+          NAVER_EMAIL: ${{ secrets.NAVER_EMAIL }}
+          NAVER_PW: ${{ secrets.NAVER_PW }}
         run: python check_site.py
 
       - name: Upload screenshots
@@ -37,10 +40,3 @@ jobs:
         with:
           name: screenshots
           path: "*.png"
-      - name: Run script
-              env:
-                EMAIL_ID: ${{ secrets.EMAIL_ID }}
-                EMAIL_PW: ${{ secrets.EMAIL_PW }}
-                NAVER_EMAIL: ${{ secrets.NAVER_EMAIL }}
-                NAVER_PW: ${{ secrets.NAVER_PW }}
-              run: python check_site.py
