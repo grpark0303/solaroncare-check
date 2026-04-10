@@ -1,5 +1,4 @@
 name: Daily Site Check
-
 on:
   schedule:
     - cron: '0 22 * * *'
@@ -34,7 +33,7 @@ jobs:
 
       - name: Upload screenshots
         if: always()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4   ← 여기만 v3 → v4
         with:
           name: screenshots
           path: "*.png"
