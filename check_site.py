@@ -4,6 +4,9 @@ import time
 import os
 import traceback
 import random
+import imaplib
+import email
+import re
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
@@ -14,12 +17,10 @@ from selenium.webdriver.support import expected_conditions as EC
 
 
 def human_delay(min_sec=1.0, max_sec=3.0):
-    """사람처럼 랜덤하게 대기"""
     time.sleep(random.uniform(min_sec, max_sec))
 
 
 def human_type(element, text):
-    """사람처럼 한 글자씩 타이핑"""
     for char in text:
         element.send_keys(char)
         time.sleep(random.uniform(0.05, 0.2))
@@ -29,6 +30,65 @@ def click(driver, el):
     driver.execute_script("arguments[0].scrollIntoView({block:'center'});", el)
     human_delay(0.5, 1.5)
     driver.execute_script("arguments[0].click();", el)
+
+
+def get_auth_code_from_naver(naver_email, naver_pw, timeout=60):
+    """네이버 IMAP으로 인증번호 6자리 추출"""
+    print("[IMAP] 네이버 메일 접속 시도")
+    start_time = time.time()
+
+    while time.time() - start_time < timeout:
+        try:
+            mail = imaplib.IMAP4_SSL("imap.naver.com", 993)
+            mail.login(naver_email, naver_pw)
+            mail.select("INBOX")
+
+            # 최근 메일 검색
+            result, data = mail.search(None, "ALL")
+            mail_ids = data[0].split()
+
+            # 최신 메일부터 역순으로 확인
+            for mail_id in reversed(mail_ids[-10:]):
+                result, msg_data = mail.fetch(mail_id, "(RFC822)")
+                msg = email.message_from_bytes(msg_data[0][1])
+
+                # 제목 확인
+                subject = ""
+                if msg["Subject"]:
+                    subject = email.header.decode_header(msg["Subject"])[0][0]
+                    if isinstance(subject, bytes):
+                        subject = subject.decode("utf-8", errors="ignore")
+
+                print(f"[IMAP] 메일 제목: {subject}")
+
+                # 솔라온케어 인증 메일인지 확인
+                if "인증" in subject or "solaroncare" in subject.lower() or "솔라온" in subject:
+                    body = ""
+                    if msg.is_multipart():
+                        for part in msg.walk():
+                            if part.get_content_type() == "text/plain":
+                                body = part.get_payload(decode=True).decode("utf-8", errors="ignore")
+                                break
+                            elif part.get_content_type() == "text/html":
+                                body = part.get_payload(decode=True).decode("utf-8", errors="ignore")
+                    else:
+                        body = msg.get_payload(decode=True).decode("utf-8", errors="ignore")
+
+                    # 6자리 숫자 추출
+                    codes = re.findall(r'\b\d{6}\b', body)
+                    if codes:
+                        print(f"[IMAP] 인증번호 찾음: {codes[0]}")
+                        mail.logout()
+                        return codes[0]
+
+            mail.logout()
+        except Exception as e:
+            print(f"[IMAP] 오류: {e}")
+
+        print("[IMAP] 인증번호 대기 중... 5초 후 재시도")
+        time.sleep(5)
+
+    raise Exception("인증번호를 메일에서 찾지 못했습니다 (타임아웃)")
 
 
 def run_automation():
@@ -54,7 +114,6 @@ def run_automation():
         service=Service(ChromeDriverManager().install()), options=options
     )
 
-    # 봇 감지 우회 — navigator 속성 조작
     driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {
         "source": """
             Object.defineProperty(navigator, 'webdriver', {get: () => undefined});
@@ -62,14 +121,7 @@ def run_automation():
             Object.defineProperty(navigator, 'languages', {get: () => ['ko-KR', 'ko', 'en-US', 'en']});
             Object.defineProperty(navigator, 'platform', {get: () => 'Win32'});
             Object.defineProperty(navigator, 'hardwareConcurrency', {get: () => 8});
-            Object.defineProperty(navigator, 'deviceMemory', {get: () => 8});
             window.chrome = { runtime: {} };
-            const originalQuery = window.navigator.permissions.query;
-            window.navigator.permissions.query = (parameters) => (
-                parameters.name === 'notifications' ?
-                Promise.resolve({ state: Notification.permission }) :
-                originalQuery(parameters)
-            );
         """
     })
 
@@ -80,11 +132,13 @@ def run_automation():
     try:
         user_id = os.environ.get('EMAIL_ID')
         user_pw = os.environ.get('EMAIL_PW')
+        naver_email = os.environ.get('NAVER_EMAIL')
+        naver_pw = os.environ.get('NAVER_PW')
 
         # ── 1. 로그인 ──────────────────────────────────────────────
         print("[1] 로그인 페이지 접속")
         driver.get("https://solaroncare.com/oncarehome/login")
-        human_delay(4, 6)  # 페이지 충분히 로드
+        human_delay(4, 6)
         driver.save_screenshot("step1_login_page.png")
 
         print("[2] 이메일 입력")
@@ -93,7 +147,7 @@ def run_automation():
         ))
         id_input.click()
         human_delay(0.5, 1.0)
-        human_type(id_input, user_id)  # 한 글자씩 타이핑
+        human_type(id_input, user_id)
         human_delay(1.0, 2.0)
 
         print("[3] 비밀번호 입력")
@@ -102,8 +156,8 @@ def run_automation():
         ))
         pw_input.click()
         human_delay(0.5, 1.0)
-        human_type(pw_input, user_pw)  # 한 글자씩 타이핑
-        human_delay(2.0, 3.0)  # 로그인 버튼 활성화 기다림
+        human_type(pw_input, user_pw)
+        human_delay(2.0, 3.0)
         driver.save_screenshot("step2_after_input.png")
 
         print("[4] 로그인 버튼 클릭")
@@ -114,27 +168,52 @@ def run_automation():
              "and .//div[contains(text(),'로그인')]]")
         ))
         click(driver, login_btn)
-        human_delay(8, 12)  # 로그인 처리 충분히 대기
+        human_delay(5, 7)
         driver.save_screenshot("step3_after_login_click.png")
-        print(f"[4] 로그인 후 URL: {driver.current_url}")
+
+        # ── 2단계 인증 처리 ────────────────────────────────────────
+        if "login" in driver.current_url:
+            print("[5] 2단계 인증 팝업 감지 — 네이버 메일에서 인증번호 읽는 중")
+
+            # 네이버 메일에서 인증번호 추출
+            auth_code = get_auth_code_from_naver(naver_email, naver_pw, timeout=60)
+
+            # 인증번호 입력
+            code_input = wait.until(EC.presence_of_element_located(
+                (By.CSS_SELECTOR, "input[placeholder*='인증번호']")
+            ))
+            code_input.click()
+            human_delay(0.5, 1.0)
+            human_type(code_input, auth_code)
+            human_delay(1.0, 2.0)
+            driver.save_screenshot("step4_auth_code_input.png")
+
+            # 인증 완료하기 버튼 클릭
+            confirm_btn = wait.until(EC.presence_of_element_located(
+                (By.XPATH, "//*[contains(text(),'인증 완료하기')]")
+            ))
+            click(driver, confirm_btn)
+            human_delay(5, 7)
+            driver.save_screenshot("step5_after_auth.png")
+            print(f"[5] 인증 후 URL: {driver.current_url}")
 
         if "login" in driver.current_url:
-            raise Exception(f"로그인 실패 — 현재 URL: {driver.current_url}")
+            raise Exception("인증 후에도 로그인 실패")
 
         report_details.append("✅ 로그인 : 완료")
-        driver.save_screenshot("step4_after_login.png")
+        print("[6] 로그인 성공!")
 
-        # ── 2. 상담 예약하기 ───────────────────────────────────────
-        print("[5] 서비스 소개 페이지 이동")
+        # ── 3. 상담 예약하기 ───────────────────────────────────────
+        print("[7] 서비스 소개 페이지 이동")
         driver.get(
             "https://solaroncare.com/oncarehome/oncare"
             "?tab=%EC%84%9C%EB%B9%84%EC%8A%A4+%EC%86%8C%EA%B0%9C"
         )
         human_delay(5, 7)
-        driver.save_screenshot("step5_service_page.png")
+        driver.save_screenshot("step6_service_page.png")
 
         try:
-            print("[6] 상담 예약하기 버튼 클릭")
+            print("[8] 상담 예약하기 버튼 클릭")
             consult_btn = wait.until(EC.presence_of_element_located(
                 (By.XPATH,
                  "//div[contains(@class,'button--label') "
@@ -143,9 +222,9 @@ def run_automation():
             ))
             click(driver, consult_btn)
             human_delay(3, 5)
-            driver.save_screenshot("step6_after_consult_click.png")
+            driver.save_screenshot("step7_after_consult_click.png")
 
-            print("[7] 보유 버튼 클릭")
+            print("[9] 보유 버튼 클릭")
             own_btn = wait.until(EC.presence_of_element_located(
                 (By.XPATH,
                  "//span[contains(@class,'button-2') "
@@ -153,9 +232,9 @@ def run_automation():
             ))
             click(driver, own_btn)
             human_delay(3, 5)
-            driver.save_screenshot("step7_after_own_click.png")
+            driver.save_screenshot("step8_after_own_click.png")
 
-            print("[8] 동의 체크박스 클릭")
+            print("[10] 동의 체크박스 클릭")
             agree_label = wait.until(EC.presence_of_element_located(
                 (By.XPATH,
                  "//div[contains(@class,'checkbox__label--text') "
@@ -163,9 +242,9 @@ def run_automation():
             ))
             click(driver, agree_label)
             human_delay(2, 3)
-            driver.save_screenshot("step8_after_agree.png")
+            driver.save_screenshot("step9_after_agree.png")
 
-            print("[9] 예약하기 버튼 클릭")
+            print("[11] 예약하기 버튼 클릭")
             submit_btn = wait.until(EC.presence_of_element_located(
                 (By.XPATH,
                  "//div[contains(@class,'bg-main-color') "
@@ -174,8 +253,7 @@ def run_automation():
             ))
             click(driver, submit_btn)
             human_delay(10, 12)
-            driver.save_screenshot("step9_after_submit.png")
-            print(f"[9] 제출 후 URL: {driver.current_url}")
+            driver.save_screenshot("step10_after_submit.png")
 
             if "result" in driver.current_url.lower() or "complete" in driver.current_url.lower():
                 report_details.append("✅ 상담 예약 신청 : 완료")
@@ -198,8 +276,8 @@ def run_automation():
             report_details.append(f"❌ 상담 예약 신청 : 실패 ({str(e)})")
             total_status = "오류발생"
 
-        # ── 3. 직접 신청하기 ───────────────────────────────────────
-        print("[10] 직접 신청하기")
+        # ── 4. 직접 신청하기 ───────────────────────────────────────
+        print("[12] 직접 신청하기")
         driver.get(
             "https://solaroncare.com/oncarehome/oncare"
             "?tab=%EC%84%9C%EB%B9%84%EC%8A%A4+%EC%86%8C%EA%B0%9C"
@@ -215,7 +293,7 @@ def run_automation():
             ))
             click(driver, direct_btn)
             human_delay(5, 7)
-            driver.save_screenshot("step10_direct_apply.png")
+            driver.save_screenshot("step11_direct_apply.png")
             report_details.append("✅ 직접 신청하기 : 클릭 완료")
         except Exception as e:
             err = traceback.format_exc()
@@ -224,7 +302,7 @@ def run_automation():
             report_details.append(f"❌ 직접 신청하기 : 실패 ({str(e)})")
             total_status = "오류발생"
 
-        # ── 4. 자사 페이지 점검 ────────────────────────────────────
+        # ── 5. 자사 페이지 점검 ────────────────────────────────────
         pages = {
             "상세 페이지": "https://solaroncare.com/oncarehome/oncare?tab=%EC%84%9C%EB%B9%84%EC%8A%A4+%EC%86%8C%EA%B0%9C",
             "이벤트 페이지": "https://solaroncare.com/oncarehome/coupons",
@@ -235,7 +313,7 @@ def run_automation():
             human_delay(4, 6)
             report_details.append(f"✅ {name} : 정상")
 
-        # ── 5. 네이버 BSA ──────────────────────────────────────────
+        # ── 6. 네이버 BSA ──────────────────────────────────────────
         report_details.extend([
             "✅ 네이버 BSA 메인 : 정상",
             "✅ 네이버 BSA 썸네일1 : 정상",
