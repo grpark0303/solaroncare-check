@@ -1,4 +1,5 @@
 name: Daily Site Check
+
 on:
   schedule:
     - cron: '0 22 * * *'
@@ -30,7 +31,8 @@ jobs:
           EMAIL_ID: ${{ secrets.EMAIL_ID }}
           EMAIL_PW: ${{ secrets.EMAIL_PW }}
         run: python check_site.py
-- name: Upload screenshots
+
+      - name: Upload screenshots
         if: always()
         uses: actions/upload-artifact@v3
         with:
