@@ -128,7 +128,7 @@ def run_automation():
             Object.defineProperty(navigator, 'hardwareConcurrency', {get: () => 8});
             window.chrome = { runtime: {} };
         """
-    ))
+    })
 
     wait = WebDriverWait(driver, 30)
     short_wait = WebDriverWait(driver, 5)
@@ -244,7 +244,6 @@ def run_automation():
             human_delay(3, 5)
             driver.save_screenshot("step7_after_consult_click.png")
 
-            # ✅ 바깥 div 클릭 — span 텍스트로 부모 찾기
             print("[8-1] 네 보유 버튼 클릭")
             own_btn = wait.until(EC.presence_of_element_located(
                 (By.XPATH,
@@ -256,7 +255,6 @@ def run_automation():
             human_delay(3, 5)
             driver.save_screenshot("step8_after_own_click.png")
 
-            # ✅ 개인정보 동의 체크박스
             print("[8-2] 개인정보 동의 클릭")
             agree_label = wait.until(EC.presence_of_element_located(
                 (By.XPATH,
@@ -268,7 +266,6 @@ def run_automation():
             human_delay(2, 3)
             driver.save_screenshot("step9_after_agree.png")
 
-            # ✅ 예약하기 버튼
             print("[8-3] 예약하기 버튼 클릭")
             submit_btn = wait.until(EC.presence_of_element_located(
                 (By.XPATH,
