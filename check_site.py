@@ -284,27 +284,179 @@ def run_automation():
             print(f"[8] 상담 예약 스킵: {e}")
             report_details.append("➖ 상담 예약 신청 : 해당없음(버튼 미노출)")
 
-        # ── 3. 직접 신청하기 ───────────────────────────────────────
-        print("[9] 직접 신청하기")
-        driver.get("https://solaroncare.com/oncarehome/oncare"
-                   "?tab=%EC%84%9C%EB%B9%84%EC%8A%A4+%EC%86%8C%EA%B0%9C")
-        human_delay(5, 7)
+       # ── 3. 직접 신청하기 ───────────────────────────────────────
+print("[9] 직접 신청하기")
+driver.get("https://solaroncare.com/oncarehome/oncare")
+human_delay(5, 7)
 
-        try:
-            direct_btn = short_wait.until(EC.presence_of_element_located(
-                (By.XPATH,
-                 "//div[contains(@class,'button--label') "
-                 "and contains(@class,'text-gray-2') "
-                 "and contains(text(),'직접 신청하기')]")
-            ))
-            click(driver, direct_btn)
-            human_delay(5, 7)
-            driver.save_screenshot("step11_direct_apply.png")
-            report_details.append("✅ 직접 신청하기 : 클릭 완료")
-            print("[9] 직접 신청하기 완료")
-        except Exception as e:
-            print(f"[9] 직접 신청하기 스킵: {e}")
-            report_details.append("➖ 직접 신청하기 : 해당없음(버튼 미노출)")
+try:
+    # Step 2: [직접 신청하기] 버튼 클릭
+    print("[9-1] 직접 신청하기 버튼 클릭")
+    direct_btn = wait.until(EC.presence_of_element_located(
+        (By.XPATH,
+         "//div[contains(@class,'button--label') "
+         "and contains(@class,'text-gray-2') "
+         "and contains(text(),'직접 신청하기')]")
+    ))
+    click(driver, direct_btn)
+    human_delay(5, 7)
+    driver.save_screenshot("step11_direct_apply.png")
+
+    # Step 3: [신규 발전소 서비스 신청하기] 버튼 클릭
+    print("[9-2] 신규 발전소 서비스 신청하기 버튼 클릭")
+    new_plant_btn = wait.until(EC.presence_of_element_located(
+        (By.XPATH,
+         "//div[contains(@class,'button--label') "
+         "and contains(@class,'text-white') "
+         "and contains(text(),'신규 발전소 서비스 신청하기')]")
+    ))
+    click(driver, new_plant_btn)
+    human_delay(3, 5)
+    driver.save_screenshot("step12_new_plant.png")
+
+    # Step 4: 발전소명 입력
+    print("[9-3] 발전소명 입력")
+    plant_name_input = wait.until(EC.presence_of_element_located(
+        (By.XPATH, "//input[@placeholder='발전소명을 입력해 주세요']")
+    ))
+    plant_name_input.click()
+    human_delay(0.5, 1.0)
+    human_type(plant_name_input, "테스트")
+    human_delay(1.0, 2.0)
+    driver.save_screenshot("step13_plant_name.png")
+
+    # Step 5: [직접 입력] 버튼 클릭
+    print("[9-4] 직접 입력 버튼 클릭")
+    direct_input_btn = wait.until(EC.presence_of_element_located(
+        (By.XPATH,
+         "//div[contains(@class,'button--label') "
+         "and contains(@class,'text-gray-2') "
+         "and contains(text(),'직접 입력')]")
+    ))
+    click(driver, direct_input_btn)
+    human_delay(2, 3)
+    driver.save_screenshot("step14_direct_input_btn.png")
+
+    # Step 6: 주소 입력
+    print("[9-5] 주소 입력")
+    address_input = wait.until(EC.presence_of_element_located(
+        (By.XPATH, "//input[@placeholder='주소를 입력해 주세요']")
+    ))
+    address_input.click()
+    human_delay(0.5, 1.0)
+    human_type(address_input, "서울시 강남구 학동로 402 천마빌딩")
+    human_delay(1.0, 2.0)
+    driver.save_screenshot("step15_address.png")
+
+    # Step 7: 용량(kW) 입력
+    print("[9-6] 발전 용량 입력")
+    capacity_input = wait.until(EC.presence_of_element_located(
+        (By.XPATH, "//input[@placeholder='예 ) 49.945']")
+    ))
+    capacity_input.click()
+    human_delay(0.5, 1.0)
+    human_type(capacity_input, "50")
+    human_delay(1.0, 2.0)
+    driver.save_screenshot("step16_capacity.png")
+
+    # Step 8: 사업자등록번호 입력
+    print("[9-7] 사업자등록번호 입력")
+    biz_num_input = wait.until(EC.presence_of_element_located(
+        (By.XPATH, "//input[@placeholder=\"'-' 없이 숫자만 입력해 주세요\"]")
+    ))
+    biz_num_input.click()
+    human_delay(0.5, 1.0)
+    human_type(biz_num_input, "88812312321")
+    human_delay(1.0, 2.0)
+    driver.save_screenshot("step17_biz_num.png")
+
+    # Step 9: 상호명 입력
+    print("[9-8] 상호명 입력")
+    company_input = wait.until(EC.presence_of_element_located(
+        (By.XPATH, "//input[@placeholder='상호명 또는 법인명을 입력해 주세요']")
+    ))
+    company_input.click()
+    human_delay(0.5, 1.0)
+    human_type(company_input, "테스트")
+    human_delay(1.0, 2.0)
+    driver.save_screenshot("step18_company_name.png")
+
+    # Step 10: [다음] 버튼 클릭
+    print("[9-9] 다음 버튼 클릭 (1차)")
+    next_btn = wait.until(EC.presence_of_element_located(
+        (By.XPATH,
+         "//div[contains(@class,'button--label') "
+         "and contains(@class,'text-white') "
+         "and contains(text(),'다음')]")
+    ))
+    click(driver, next_btn)
+    human_delay(5, 7)
+    driver.save_screenshot("step19_after_next1.png")
+    print(f"[9-9] 1차 다음 후 URL: {driver.current_url}")
+
+    # Step 11: ease_apply/pc 페이지에서 [다음] 버튼 클릭
+    print("[9-10] 다음 버튼 클릭 (2차 - ease_apply/pc)")
+    wait.until(EC.url_contains("ease_apply/pc"))
+    next_btn_2 = wait.until(EC.presence_of_element_located(
+        (By.XPATH,
+         "//div[contains(@class,'button--label') "
+         "and contains(@class,'text-white') "
+         "and contains(text(),'다음')]")
+    ))
+    click(driver, next_btn_2)
+    human_delay(5, 7)
+    driver.save_screenshot("step20_after_next2.png")
+    print(f"[9-10] 2차 다음 후 URL: {driver.current_url}")
+
+    # Step 12: [약관 확인하기] 버튼 클릭
+    print("[9-11] 약관 확인하기 버튼 클릭")
+    terms_btn = wait.until(EC.presence_of_element_located(
+        (By.XPATH,
+         "//div[contains(@class,'button--label') "
+         "and contains(@class,'text-white') "
+         "and contains(text(),'약관 확인하기')]")
+    ))
+    click(driver, terms_btn)
+    human_delay(5, 7)
+    driver.save_screenshot("step21_terms.png")
+
+    # Step 13: 서명 이미지(img) 버튼 클릭
+    print("[9-12] 서명 이미지 버튼 클릭")
+    sign_img = wait.until(EC.presence_of_element_located(
+        (By.XPATH,
+         "//img[contains(@src,'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACoAAAAY')]")
+    ))
+    click(driver, sign_img)
+    human_delay(5, 7)
+    driver.save_screenshot("step22_sign_img.png")
+
+    # Step 14: [전체 동의하기] 버튼 클릭
+    print("[9-13] 전체 동의하기 버튼 클릭")
+    agree_all_btn = wait.until(EC.presence_of_element_located(
+        (By.XPATH,
+         "//div[contains(@class,'button--label') "
+         "and contains(@class,'text-white') "
+         "and contains(text(),'전체 동의하기')]")
+    ))
+    click(driver, agree_all_btn)
+    human_delay(8, 10)
+    driver.save_screenshot("step23_after_agree_all.png")
+    print(f"[9-13] 전체 동의 후 URL: {driver.current_url}")
+
+    # Step 15: 완료 페이지 확인
+    if "ease_apply/pc/completed" in driver.current_url:
+        print("[9-14] 직접 신청 완료 페이지 도달 성공!")
+        report_details.append("✅ 직접 신청하기 : 완료")
+    else:
+        raise Exception(f"완료 페이지 미도달 - 현재 URL: {driver.current_url}")
+
+except Exception as e:
+    print(f"[9] 직접 신청하기 오류: {e}")
+    report_details.append(f"❌ 직접 신청하기 : 오류 - {e}")
+    try:
+        driver.save_screenshot("error_direct_apply.png")
+    except Exception:
+        pass
 
         # ── 4. 자사 페이지 점검 ────────────────────────────────────
         pages = {
