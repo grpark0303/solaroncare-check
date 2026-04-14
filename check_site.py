@@ -128,7 +128,7 @@ def run_automation():
             Object.defineProperty(navigator, 'hardwareConcurrency', {get: () => 8});
             window.chrome = { runtime: {} };
         """
-    })
+    ))
 
     wait = WebDriverWait(driver, 30)
     short_wait = WebDriverWait(driver, 5)
@@ -224,7 +224,7 @@ def run_automation():
         report_details.append("✅ 로그인 : 완료")
         print("[6] 로그인 성공!")
 
-        # ── 2. 상담 예약하기 (있으면 진행, 없으면 스킵) ───────────
+        # ── 2. 상담 예약하기 ───────────────────────────────────────
         print("[7] 서비스 소개 페이지 이동")
         driver.get("https://solaroncare.com/oncarehome/oncare"
                    "?tab=%EC%84%9C%EB%B9%84%EC%8A%A4+%EC%86%8C%EA%B0%9C")
@@ -233,7 +233,6 @@ def run_automation():
 
         try:
             print("[8] 상담 예약하기 버튼 찾는 중")
-            # ✅ bg-sub-color-1 클래스로 정확히 잡기
             consult_btn = short_wait.until(EC.presence_of_element_located(
                 (By.XPATH,
                  "//div[contains(@class,'bg-sub-color-1') "
@@ -245,27 +244,32 @@ def run_automation():
             human_delay(3, 5)
             driver.save_screenshot("step7_after_consult_click.png")
 
-            # ✅ "네, 보유하고 있습니다." span 태그
+            # ✅ 바깥 div 클릭 — span 텍스트로 부모 찾기
+            print("[8-1] 네 보유 버튼 클릭")
             own_btn = wait.until(EC.presence_of_element_located(
                 (By.XPATH,
-                 "//span[contains(@class,'button-2') "
-                 "and contains(text(),'네, 보유하고 있습니다')]")
+                 "//div[contains(@class,'button--label') "
+                 "and .//span[contains(text(),'네, 보유하고 있습니다')]]")
             ))
             click(driver, own_btn)
+            print("[8-1] 네 보유 버튼 클릭 완료")
             human_delay(3, 5)
             driver.save_screenshot("step8_after_own_click.png")
 
             # ✅ 개인정보 동의 체크박스
+            print("[8-2] 개인정보 동의 클릭")
             agree_label = wait.until(EC.presence_of_element_located(
                 (By.XPATH,
                  "//div[contains(@class,'checkbox__label--text') "
                  "and contains(text(),'개인정보 수집 및 이용 동의')]")
             ))
             click(driver, agree_label)
+            print("[8-2] 개인정보 동의 클릭 완료")
             human_delay(2, 3)
             driver.save_screenshot("step9_after_agree.png")
 
-            # ✅ 예약하기 버튼 — text-white + "예약하기" 텍스트
+            # ✅ 예약하기 버튼
+            print("[8-3] 예약하기 버튼 클릭")
             submit_btn = wait.until(EC.presence_of_element_located(
                 (By.XPATH,
                  "//div[contains(@class,'button--label') "
@@ -274,13 +278,13 @@ def run_automation():
                  "and not(contains(text(),'상담'))]")
             ))
             click(driver, submit_btn)
+            print("[8-3] 예약하기 버튼 클릭 완료")
             human_delay(10, 12)
             driver.save_screenshot("step10_after_submit.png")
             report_details.append("✅ 상담 예약 신청 : 완료")
-            print("[8] 상담 예약 완료")
 
-        except Exception:
-            print("[8] 상담 예약 버튼 없음 → 스킵")
+        except Exception as e:
+            print(f"[8] 상담 예약 스킵: {e}")
             report_details.append("➖ 상담 예약 신청 : 해당없음(버튼 미노출)")
 
         # ── 3. 직접 신청하기 ───────────────────────────────────────
@@ -301,8 +305,8 @@ def run_automation():
             driver.save_screenshot("step11_direct_apply.png")
             report_details.append("✅ 직접 신청하기 : 클릭 완료")
             print("[9] 직접 신청하기 완료")
-        except Exception:
-            print("[9] 직접 신청하기 버튼 없음 → 스킵")
+        except Exception as e:
+            print(f"[9] 직접 신청하기 스킵: {e}")
             report_details.append("➖ 직접 신청하기 : 해당없음(버튼 미노출)")
 
         # ── 4. 자사 페이지 점검 ────────────────────────────────────
