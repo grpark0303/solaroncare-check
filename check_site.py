@@ -7,6 +7,7 @@ import random
 import imaplib
 import email
 import re
+from bs4 import BeautifulSoup
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
@@ -33,7 +34,7 @@ def click(driver, el):
 
 
 def get_auth_code(gmail_address, gmail_app_pw, timeout=90):
-    """Gmail IMAP으로 솔라온케어 인증번호 추출"""
+    """Gmail IMAP으로 솔라온케어 인증번호 추출 — h4 태그에서 직접 뽑기"""
     print("[IMAP] Gmail 접속 시도...")
     start_time = time.time()
 
@@ -65,38 +66,26 @@ def get_auth_code(gmail_address, gmail_app_pw, timeout=90):
                     print("[IMAP] 인증 메일 발견!")
 
                     html_body = ""
-                    text_body = ""
-
                     if msg.is_multipart():
                         for part in msg.walk():
-                            content_type = part.get_content_type()
-                            if content_type == "text/plain":
-                                text_body = part.get_payload(decode=True).decode("utf-8", errors="ignore")
-                            elif content_type == "text/html":
+                            if part.get_content_type() == "text/html":
                                 html_body = part.get_payload(decode=True).decode("utf-8", errors="ignore")
+                                break
                     else:
-                        raw = msg.get_payload(decode=True).decode("utf-8", errors="ignore")
-                        if "<html" in raw.lower():
-                            html_body = raw
-                        else:
-                            text_body = raw
+                        html_body = msg.get_payload(decode=True).decode("utf-8", errors="ignore")
 
-                    if text_body:
-                        body = text_body
-                    else:
-                        body = re.sub(r'<[^>]+>', ' ', html_body)
-                        body = re.sub(r'&nbsp;|&amp;|&lt;|&gt;', ' ', body)
+                    # h4 태그에서 6자리 숫자 직접 추출
+                    soup = BeautifulSoup(html_body, "html.parser")
+                    h4_tags = soup.find_all("h4")
+                    for h4 in h4_tags:
+                        text = h4.get_text().strip()
+                        print(f"[IMAP] h4 태그 내용: {text}")
+                        if re.match(r'^\d{6}$', text):
+                            print(f"[IMAP] 인증번호 추출 성공: {text}")
+                            mail.logout()
+                            return text
 
-                    print(f"[IMAP] 추출된 텍스트: {body[:300]}")
-
-                    codes = re.findall(r'(?<![0-9/\-_=:.])\b([1-9]\d{5})\b(?![0-9/\-_=:.])', body)
-
-                    if codes:
-                        print(f"[IMAP] 인증번호 추출 성공: {codes[0]}")
-                        mail.logout()
-                        return codes[0]
-                    else:
-                        print(f"[IMAP] 6자리 숫자 없음, 전체 텍스트: {body}")
+                    print("[IMAP] h4에서 못 찾음")
 
             mail.logout()
 
