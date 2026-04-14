@@ -329,14 +329,12 @@ def run_automation():
             human_delay(1.0, 2.0)
             driver.save_screenshot("step14_plant_name_input.png")
 
-            # Step 5: [직접 입력] 버튼 클릭
+            # Step 5: [직접 입력] 버튼 클릭 ← 여기 수정
             print("[9-4] 직접 입력 버튼 클릭")
             direct_input_btn = wait.until(EC.presence_of_element_located(
                 (By.XPATH,
                  "//div[contains(@class,'button--label') "
-                 "and contains(@class,'button-2') "
-                 "and contains(@class,'text-gray-2') "
-                 "and contains(text(),'직접 입력')]")
+                 "and normalize-space(text())='직접 입력']")
             ))
             click(driver, direct_input_btn)
             human_delay(2, 3)
@@ -392,7 +390,7 @@ def run_automation():
                 (By.XPATH,
                  "//div[contains(@class,'button--label') "
                  "and contains(@class,'text-white') "
-                 "and contains(text(),'다음')]")
+                 "and normalize-space(text())='다음']")
             ))
             click(driver, next_btn)
             human_delay(5, 7)
@@ -406,7 +404,7 @@ def run_automation():
                 (By.XPATH,
                  "//div[contains(@class,'button--label') "
                  "and contains(@class,'text-white') "
-                 "and contains(text(),'다음')]")
+                 "and normalize-space(text())='다음']")
             ))
             click(driver, next_btn_2)
             human_delay(5, 7)
@@ -419,7 +417,7 @@ def run_automation():
                 (By.XPATH,
                  "//div[contains(@class,'button--label') "
                  "and contains(@class,'text-white') "
-                 "and contains(text(),'약관 확인하기')]")
+                 "and normalize-space(text())='약관 확인하기']")
             ))
             click(driver, terms_btn)
             human_delay(5, 7)
@@ -442,7 +440,7 @@ def run_automation():
                 (By.XPATH,
                  "//div[contains(@class,'button--label') "
                  "and contains(@class,'text-white') "
-                 "and contains(text(),'전체 동의하기')]")
+                 "and normalize-space(text())='전체 동의하기']")
             ))
             click(driver, agree_all_btn)
             human_delay(8, 10)
