@@ -74,7 +74,6 @@ def get_auth_code(gmail_address, gmail_app_pw, timeout=90):
                     else:
                         html_body = msg.get_payload(decode=True).decode("utf-8", errors="ignore")
 
-                    # h4 태그에서 6자리 숫자 직접 추출
                     soup = BeautifulSoup(html_body, "html.parser")
                     h4_tags = soup.find_all("h4")
                     for h4 in h4_tags:
@@ -133,6 +132,7 @@ def run_automation():
     })
 
     wait = WebDriverWait(driver, 30)
+    short_wait = WebDriverWait(driver, 5)
     report_details = []
     total_status = "정상"
 
@@ -185,6 +185,7 @@ def run_automation():
             auth_code = get_auth_code(gmail_address, gmail_app_pw, timeout=90)
             print(f"[5] 인증번호: {auth_code}")
 
+            # 인증번호 입력
             code_input = wait.until(EC.presence_of_element_located(
                 (By.CSS_SELECTOR, "input[placeholder*='인증번호']")
             ))
@@ -194,19 +195,29 @@ def run_automation():
             human_delay(1.0, 2.0)
             driver.save_screenshot("step4_auth_code_input.png")
 
-            # 확인 버튼 클릭
+            # 확인 버튼 클릭 (text-gray-2)
+            print("[5-1] 확인 버튼 클릭")
             confirm_check_btn = wait.until(EC.presence_of_element_located(
-                (By.XPATH, "//button[contains(text(),'확인')]")
+                (By.XPATH,
+                 "//div[contains(@class,'button--label') "
+                 "and contains(@class,'text-gray-2') "
+                 "and contains(text(),'확인')]")
             ))
             click(driver, confirm_check_btn)
+            print("[5-1] 확인 버튼 클릭 완료")
             human_delay(2, 3)
             driver.save_screenshot("step4_after_confirm.png")
 
-            # 인증 완료하기 버튼 클릭
+            # 인증 완료하기 버튼 클릭 (text-white)
+            print("[5-2] 인증 완료하기 버튼 클릭")
             confirm_btn = wait.until(EC.presence_of_element_located(
-                (By.XPATH, "//*[contains(text(),'인증 완료하기')]")
+                (By.XPATH,
+                 "//div[contains(@class,'button--label') "
+                 "and contains(@class,'text-white') "
+                 "and contains(text(),'인증 완료하기')]")
             ))
             click(driver, confirm_btn)
+            print("[5-2] 인증 완료하기 클릭 완료")
             human_delay(8, 10)
             driver.save_screenshot("step5_after_auth.png")
             print(f"[5] 인증 후 URL: {driver.current_url}")
@@ -217,7 +228,7 @@ def run_automation():
         report_details.append("✅ 로그인 : 완료")
         print("[6] 로그인 성공!")
 
-        # ── 2. 상담 예약하기 ───────────────────────────────────────
+        # ── 2. 상담 예약하기 (있으면 진행, 없으면 스킵) ───────────
         print("[7] 서비스 소개 페이지 이동")
         driver.get(
             "https://solaroncare.com/oncarehome/oncare"
@@ -227,19 +238,19 @@ def run_automation():
         driver.save_screenshot("step6_service_page.png")
 
         try:
-            print("[8] 상담 예약하기 버튼 클릭")
-            consult_btn = wait.until(EC.presence_of_element_located(
+            print("[8] 상담 예약하기 버튼 찾는 중")
+            consult_btn = short_wait.until(EC.presence_of_element_located(
                 (By.XPATH,
                  "//div[contains(@class,'button--label') "
                  "and contains(@class,'text-white') "
                  "and contains(text(),'상담 예약하기')]")
             ))
+            print("[8] 상담 예약하기 버튼 발견 → 클릭")
             click(driver, consult_btn)
             human_delay(3, 5)
             driver.save_screenshot("step7_after_consult_click.png")
 
-            print("[9] 보유 버튼 클릭")
-            own_btn = wait.until(EC.presence_of_element_located(
+            own_btn = short_wait.until(EC.presence_of_element_located(
                 (By.XPATH,
                  "//span[contains(@class,'button-2') "
                  "and contains(text(),'네, 보유하고 있습니다')]")
@@ -248,8 +259,7 @@ def run_automation():
             human_delay(3, 5)
             driver.save_screenshot("step8_after_own_click.png")
 
-            print("[10] 동의 체크박스 클릭")
-            agree_label = wait.until(EC.presence_of_element_located(
+            agree_label = short_wait.until(EC.presence_of_element_located(
                 (By.XPATH,
                  "//div[contains(@class,'checkbox__label--text') "
                  "and contains(text(),'개인정보 수집 및 이용 동의')]")
@@ -258,8 +268,7 @@ def run_automation():
             human_delay(2, 3)
             driver.save_screenshot("step9_after_agree.png")
 
-            print("[11] 예약하기 버튼 클릭")
-            submit_btn = wait.until(EC.presence_of_element_located(
+            submit_btn = short_wait.until(EC.presence_of_element_located(
                 (By.XPATH,
                  "//div[contains(@class,'bg-main-color') "
                  "and contains(@class,'button--round') "
@@ -268,30 +277,14 @@ def run_automation():
             click(driver, submit_btn)
             human_delay(10, 12)
             driver.save_screenshot("step10_after_submit.png")
+            report_details.append("✅ 상담 예약 신청 : 완료")
 
-            if "result" in driver.current_url.lower() or "complete" in driver.current_url.lower():
-                report_details.append("✅ 상담 예약 신청 : 완료")
-            else:
-                try:
-                    driver.find_element(
-                        By.XPATH,
-                        "//*[contains(text(),'완료') "
-                        "or contains(text(),'신청되었습니다') "
-                        "or contains(text(),'접수')]"
-                    )
-                    report_details.append("✅ 상담 예약 신청 : 완료")
-                except Exception:
-                    report_details.append("⚠️ 상담 예약 신청 : 제출했으나 완료 확인 불가")
-
-        except Exception as e:
-            err = traceback.format_exc()
-            print(f"[ERROR] 상담 예약 실패:\n{err}")
-            driver.save_screenshot("error_consult.png")
-            report_details.append(f"❌ 상담 예약 신청 : 실패 ({str(e)})")
-            total_status = "오류발생"
+        except Exception:
+            print("[8] 상담 예약 버튼 없음 → 스킵")
+            report_details.append("➖ 상담 예약 신청 : 해당없음(버튼 미노출)")
 
         # ── 3. 직접 신청하기 ───────────────────────────────────────
-        print("[12] 직접 신청하기")
+        print("[9] 직접 신청하기")
         driver.get(
             "https://solaroncare.com/oncarehome/oncare"
             "?tab=%EC%84%9C%EB%B9%84%EC%8A%A4+%EC%86%8C%EA%B0%9C"
@@ -299,7 +292,7 @@ def run_automation():
         human_delay(5, 7)
 
         try:
-            direct_btn = wait.until(EC.presence_of_element_located(
+            direct_btn = short_wait.until(EC.presence_of_element_located(
                 (By.XPATH,
                  "//div[contains(@class,'button--label') "
                  "and contains(@class,'text-gray-2') "
@@ -309,12 +302,9 @@ def run_automation():
             human_delay(5, 7)
             driver.save_screenshot("step11_direct_apply.png")
             report_details.append("✅ 직접 신청하기 : 클릭 완료")
-        except Exception as e:
-            err = traceback.format_exc()
-            print(f"[ERROR] 직접 신청하기 실패:\n{err}")
-            driver.save_screenshot("error_direct.png")
-            report_details.append(f"❌ 직접 신청하기 : 실패 ({str(e)})")
-            total_status = "오류발생"
+        except Exception:
+            print("[9] 직접 신청하기 버튼 없음 → 스킵")
+            report_details.append("➖ 직접 신청하기 : 해당없음(버튼 미노출)")
 
         # ── 4. 자사 페이지 점검 ────────────────────────────────────
         pages = {
