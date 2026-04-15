@@ -36,8 +36,12 @@ def click(driver, el):
 def get_auth_code(gmail_address, gmail_app_pw, timeout=90):
     print("[IMAP] Gmail 접속 시도...")
     start_time = time.time()
+    attempts = 0
 
-    while time.time() - start_time < timeout:
+    # ✅ 최대 3번만 시도
+    while attempts < 3 and time.time() - start_time < timeout:
+        attempts += 1
+        print(f"[IMAP] {attempts}번째 시도...")
         try:
             mail = imaplib.IMAP4_SSL("imap.gmail.com", 993)
             mail.login(gmail_address, gmail_app_pw)
@@ -90,10 +94,11 @@ def get_auth_code(gmail_address, gmail_app_pw, timeout=90):
         except Exception as e:
             print(f"[IMAP] 오류: {e}")
 
-        print("[IMAP] 7초 후 재시도...")
-        time.sleep(7)
+        if attempts < 3:
+            print("[IMAP] 7초 후 재시도...")
+            time.sleep(7)
 
-    raise Exception("인증번호 메일을 찾지 못했습니다")
+    raise Exception("인증번호 메일을 찾지 못했습니다 (3회 시도 완료)")
 
 
 def run_automation():
@@ -289,10 +294,8 @@ def run_automation():
         driver.get("https://solaroncare.com/oncarehome/oncare"
                    "?tab=%EC%84%9C%EB%B9%84%EC%8A%A4+%EC%86%8C%EA%B0%9C")
         human_delay(5, 7)
-        driver.save_screenshot("step11_direct_page.png")
 
         try:
-            # Step 2: [직접 신청하기] 버튼 클릭
             print("[9-1] 직접 신청하기 버튼 클릭")
             direct_btn = short_wait.until(EC.presence_of_element_located(
                 (By.XPATH,
@@ -302,10 +305,8 @@ def run_automation():
             ))
             click(driver, direct_btn)
             human_delay(5, 7)
-            driver.save_screenshot("step12_after_direct_click.png")
             print(f"[9-1] 직접 신청하기 클릭 후 URL: {driver.current_url}")
 
-            # Step 3: [신규 발전소 서비스 신청하기] 버튼 클릭
             print("[9-2] 신규 발전소 서비스 신청하기 버튼 클릭")
             new_plant_btn = wait.until(EC.presence_of_element_located(
                 (By.XPATH,
@@ -315,10 +316,8 @@ def run_automation():
             ))
             click(driver, new_plant_btn)
             human_delay(3, 5)
-            driver.save_screenshot("step13_after_new_plant_click.png")
             print(f"[9-2] 신규 발전소 신청하기 클릭 후 URL: {driver.current_url}")
 
-            # Step 4: 발전소명 입력
             print("[9-3] 발전소명 입력")
             plant_name_input = wait.until(EC.presence_of_element_located(
                 (By.CSS_SELECTOR, "input[placeholder='발전소명을 입력해 주세요']")
@@ -327,9 +326,7 @@ def run_automation():
             human_delay(0.5, 1.0)
             human_type(plant_name_input, "테스트")
             human_delay(1.0, 2.0)
-            driver.save_screenshot("step14_plant_name_input.png")
 
-            # Step 5: [직접 입력] 버튼 클릭 ← 여기 수정
             print("[9-4] 직접 입력 버튼 클릭")
             direct_input_btn = wait.until(EC.presence_of_element_located(
                 (By.XPATH,
@@ -338,9 +335,7 @@ def run_automation():
             ))
             click(driver, direct_input_btn)
             human_delay(2, 3)
-            driver.save_screenshot("step15_after_direct_input_click.png")
 
-            # Step 6: 주소 입력
             print("[9-5] 주소 입력")
             address_input = wait.until(EC.presence_of_element_located(
                 (By.CSS_SELECTOR, "input[placeholder='주소를 입력해 주세요']")
@@ -349,9 +344,7 @@ def run_automation():
             human_delay(0.5, 1.0)
             human_type(address_input, "서울시 강남구 학동로 402 천마빌딩")
             human_delay(1.0, 2.0)
-            driver.save_screenshot("step16_address_input.png")
 
-            # Step 7: 용량(kW) 입력
             print("[9-6] 용량 입력 (50)")
             capacity_input = wait.until(EC.presence_of_element_located(
                 (By.CSS_SELECTOR, "input[placeholder='예 ) 49.945']")
@@ -360,20 +353,20 @@ def run_automation():
             human_delay(0.5, 1.0)
             human_type(capacity_input, "50")
             human_delay(1.0, 2.0)
-            driver.save_screenshot("step17_capacity_input.png")
 
-            # Step 8: 사업자번호 입력
+            # ✅ 사업자번호 — 하이픈 제거하고 숫자만 입력
             print("[9-7] 사업자번호 입력")
             biz_num_input = wait.until(EC.presence_of_element_located(
-                (By.CSS_SELECTOR, "input[placeholder=\"'-' 없이 숫자만 입력해 주세요\"]")
+                (By.XPATH,
+                 "//input[@placeholder=\"'-' 없이 숫자만 입력해 주세요\"]")
             ))
             biz_num_input.click()
             human_delay(0.5, 1.0)
-            human_type(biz_num_input, "8881231231")
+            biz_number = "888-12-31231".replace("-", "")  # → 8881231231
+            human_type(biz_num_input, biz_number)
             human_delay(1.0, 2.0)
             driver.save_screenshot("step18_biz_num_input.png")
 
-            # Step 9: 상호명 입력
             print("[9-8] 상호명 입력")
             company_name_input = wait.until(EC.presence_of_element_located(
                 (By.CSS_SELECTOR, "input[placeholder='상호명 또는 법인명을 입력해 주세요']")
@@ -382,9 +375,7 @@ def run_automation():
             human_delay(0.5, 1.0)
             human_type(company_name_input, "테스트")
             human_delay(1.0, 2.0)
-            driver.save_screenshot("step19_company_name_input.png")
 
-            # Step 10: [다음] 버튼 클릭
             print("[9-9] 다음 버튼 클릭 (1단계)")
             next_btn = wait.until(EC.presence_of_element_located(
                 (By.XPATH,
@@ -394,12 +385,9 @@ def run_automation():
             ))
             click(driver, next_btn)
             human_delay(5, 7)
-            driver.save_screenshot("step20_after_next1.png")
             print(f"[9-9] 다음 클릭 후 URL: {driver.current_url}")
 
-            # Step 11: ease_apply/pc 페이지에서 [다음] 버튼 클릭
-            print("[9-10] ease_apply/pc 페이지 다음 버튼 클릭")
-            wait.until(lambda d: "ease_apply/pc" in d.current_url)
+            print("[9-10] 두 번째 다음 버튼 클릭")
             next_btn_2 = wait.until(EC.presence_of_element_located(
                 (By.XPATH,
                  "//div[contains(@class,'button--label') "
@@ -408,10 +396,8 @@ def run_automation():
             ))
             click(driver, next_btn_2)
             human_delay(5, 7)
-            driver.save_screenshot("step21_after_next2.png")
             print(f"[9-10] 두 번째 다음 클릭 후 URL: {driver.current_url}")
 
-            # Step 12: [약관 확인하기] 버튼 클릭
             print("[9-11] 약관 확인하기 버튼 클릭")
             terms_btn = wait.until(EC.presence_of_element_located(
                 (By.XPATH,
@@ -421,21 +407,9 @@ def run_automation():
             ))
             click(driver, terms_btn)
             human_delay(5, 7)
-            driver.save_screenshot("step22_after_terms_click.png")
             print(f"[9-11] 약관 확인하기 클릭 후 URL: {driver.current_url}")
 
-            # Step 13: 체크박스 이미지(서명/확인) 버튼 클릭
-            print("[9-12] 약관 체크 이미지 버튼 클릭")
-            check_img = wait.until(EC.presence_of_element_located(
-                (By.XPATH,
-                 "//img[contains(@src,'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACoAAAAYCAYAAACMcW/9')]")
-            ))
-            click(driver, check_img)
-            human_delay(5, 7)
-            driver.save_screenshot("step23_after_check_img_click.png")
-
-            # Step 14: [전체 동의하기] 버튼 클릭
-            print("[9-13] 전체 동의하기 버튼 클릭")
+            print("[9-12] 전체 동의하기 버튼 클릭")
             agree_all_btn = wait.until(EC.presence_of_element_located(
                 (By.XPATH,
                  "//div[contains(@class,'button--label') "
@@ -445,21 +419,17 @@ def run_automation():
             click(driver, agree_all_btn)
             human_delay(8, 10)
             driver.save_screenshot("step24_after_agree_all.png")
-            print(f"[9-13] 전체 동의하기 클릭 후 URL: {driver.current_url}")
+            print(f"[9-12] 전체 동의하기 클릭 후 URL: {driver.current_url}")
 
-            # Step 15: 완료 페이지 확인
-            print("[9-14] 완료 페이지 확인")
-            if "ease_apply/pc/completed" in driver.current_url:
-                print(f"[9-14] ✅ 직접 신청 완료 페이지 도달: {driver.current_url}")
-                report_details.append(f"✅ 직접 신청하기 : 완료 ({driver.current_url})")
+            if "completed" in driver.current_url:
+                report_details.append("✅ 직접 신청하기 : 완료")
             else:
-                print(f"[9-14] ⚠️ 예상과 다른 URL: {driver.current_url}")
                 report_details.append(f"⚠️ 직접 신청하기 : 완료 페이지 미도달 ({driver.current_url})")
 
         except Exception as e:
             err = traceback.format_exc()
             print(f"[9] 직접 신청하기 오류: {err}")
-            report_details.append(f"❌ 직접 신청하기 : 오류 발생 - {e}")
+            report_details.append(f"❌ 직접 신청하기 : 오류 ({str(e)[:100]})")
             try:
                 driver.save_screenshot("error_direct_apply.png")
             except Exception:
