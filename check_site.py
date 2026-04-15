@@ -369,7 +369,7 @@ def run_automation():
             ))
             biz_num_input.click()
             human_delay(0.5, 1.0)
-            human_type(biz_num_input, "88812312312")
+            human_type(biz_num_input, "8881231231")
             human_delay(1.0, 2.0)
             driver.save_screenshot("step18_biz_num_input.png")
 
