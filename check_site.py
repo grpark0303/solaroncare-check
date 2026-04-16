@@ -38,7 +38,6 @@ def get_auth_code(gmail_address, gmail_app_pw, timeout=90):
     start_time = time.time()
     attempts = 0
 
-    # ✅ 최대 3번만 시도
     while attempts < 3 and time.time() - start_time < timeout:
         attempts += 1
         print(f"[IMAP] {attempts}번째 시도...")
@@ -354,16 +353,14 @@ def run_automation():
             human_type(capacity_input, "50")
             human_delay(1.0, 2.0)
 
-            # ✅ 사업자번호 — 하이픈 제거하고 숫자만 입력
+            # ✅ inputmode=decimal 속성으로 사업자번호 입력창 찾기
             print("[9-7] 사업자번호 입력")
             biz_num_input = wait.until(EC.presence_of_element_located(
-                (By.XPATH,
-                 "//input[@placeholder=\"'-' 없이 숫자만 입력해 주세요\"]")
+                (By.CSS_SELECTOR, "input[inputmode='decimal']")
             ))
             biz_num_input.click()
             human_delay(0.5, 1.0)
-            biz_number = "888-12-31231".replace("-", "")  # → 8881231231
-            human_type(biz_num_input, biz_number)
+            human_type(biz_num_input, "8881231231")
             human_delay(1.0, 2.0)
             driver.save_screenshot("step18_biz_num_input.png")
 
@@ -376,7 +373,7 @@ def run_automation():
             human_type(company_name_input, "테스트")
             human_delay(1.0, 2.0)
 
-            print("[9-9] 다음 버튼 클릭 (1단계)")
+            print("[9-9] 다음 버튼 클릭")
             next_btn = wait.until(EC.presence_of_element_located(
                 (By.XPATH,
                  "//div[contains(@class,'button--label') "
@@ -385,6 +382,7 @@ def run_automation():
             ))
             click(driver, next_btn)
             human_delay(5, 7)
+            driver.save_screenshot("step20_after_next1.png")
             print(f"[9-9] 다음 클릭 후 URL: {driver.current_url}")
 
             print("[9-10] 두 번째 다음 버튼 클릭")
@@ -424,7 +422,8 @@ def run_automation():
             if "completed" in driver.current_url:
                 report_details.append("✅ 직접 신청하기 : 완료")
             else:
-                report_details.append(f"⚠️ 직접 신청하기 : 완료 페이지 미도달 ({driver.current_url})")
+                report_details.append(
+                    f"⚠️ 직접 신청하기 : 완료 페이지 미도달 ({driver.current_url})")
 
         except Exception as e:
             err = traceback.format_exc()
