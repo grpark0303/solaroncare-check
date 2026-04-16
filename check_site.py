@@ -344,19 +344,23 @@ def run_automation():
             human_type(address_input, "서울시 강남구 학동로 402 천마빌딩")
             human_delay(1.0, 2.0)
 
+            # ✅ 용량 — inputmode=decimal 이고 maxlength 없는 것
             print("[9-6] 용량 입력 (50)")
             capacity_input = wait.until(EC.presence_of_element_located(
-                (By.CSS_SELECTOR, "input[placeholder='예 ) 49.945']")
+                (By.CSS_SELECTOR,
+                 "input[placeholder='예 ) 49.945'][inputmode='decimal']")
             ))
             capacity_input.click()
             human_delay(0.5, 1.0)
             human_type(capacity_input, "50")
             human_delay(1.0, 2.0)
+            driver.save_screenshot("step17_capacity_input.png")
 
-            # ✅ inputmode=decimal 속성으로 사업자번호 입력창 찾기
+            # ✅ 사업자번호 — maxlength=12 로 구분
             print("[9-7] 사업자번호 입력")
             biz_num_input = wait.until(EC.presence_of_element_located(
-                (By.CSS_SELECTOR, "input[inputmode='decimal']")
+                (By.CSS_SELECTOR,
+                 "input[inputmode='decimal'][maxlength='12']")
             ))
             biz_num_input.click()
             human_delay(0.5, 1.0)
@@ -366,7 +370,8 @@ def run_automation():
 
             print("[9-8] 상호명 입력")
             company_name_input = wait.until(EC.presence_of_element_located(
-                (By.CSS_SELECTOR, "input[placeholder='상호명 또는 법인명을 입력해 주세요']")
+                (By.CSS_SELECTOR,
+                 "input[placeholder='상호명 또는 법인명을 입력해 주세요']")
             ))
             company_name_input.click()
             human_delay(0.5, 1.0)
@@ -394,6 +399,7 @@ def run_automation():
             ))
             click(driver, next_btn_2)
             human_delay(5, 7)
+            driver.save_screenshot("step21_after_next2.png")
             print(f"[9-10] 두 번째 다음 클릭 후 URL: {driver.current_url}")
 
             print("[9-11] 약관 확인하기 버튼 클릭")
@@ -405,6 +411,7 @@ def run_automation():
             ))
             click(driver, terms_btn)
             human_delay(5, 7)
+            driver.save_screenshot("step22_after_terms.png")
             print(f"[9-11] 약관 확인하기 클릭 후 URL: {driver.current_url}")
 
             print("[9-12] 전체 동의하기 버튼 클릭")
