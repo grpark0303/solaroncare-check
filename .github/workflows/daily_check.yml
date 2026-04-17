@@ -1,7 +1,7 @@
 name: Daily Site Check
 on:
   schedule:
-    - cron: '0 22 * * *'
+    - cron: '0 22 * * 1-5'  # 월요일부터 금요일까지, UTC 22:00(한국 시간 오전 7시)에 실행
   workflow_dispatch:
 
 jobs:
