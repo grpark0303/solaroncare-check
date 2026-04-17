@@ -207,7 +207,6 @@ def run_automation():
             click(driver, confirm_check_btn)
             print("[5-1] 확인 버튼 클릭 완료")
             human_delay(2, 3)
-            driver.save_screenshot("step4_after_confirm.png")
 
             print("[5-2] 인증 완료하기 버튼 클릭")
             confirm_btn = wait.until(EC.presence_of_element_located(
@@ -257,7 +256,6 @@ def run_automation():
             click(driver, own_btn)
             print("[8-1] 네 보유 버튼 클릭 완료")
             human_delay(3, 5)
-            driver.save_screenshot("step8_after_own_click.png")
 
             print("[8-2] 개인정보 동의 클릭")
             agree_label = wait.until(EC.presence_of_element_located(
@@ -268,7 +266,6 @@ def run_automation():
             click(driver, agree_label)
             print("[8-2] 개인정보 동의 클릭 완료")
             human_delay(2, 3)
-            driver.save_screenshot("step9_after_agree.png")
 
             print("[8-3] 예약하기 버튼 클릭")
             submit_btn = wait.until(EC.presence_of_element_located(
@@ -344,7 +341,6 @@ def run_automation():
             human_type(address_input, "서울시 강남구 학동로 402 천마빌딩")
             human_delay(1.0, 2.0)
 
-            # ✅ 용량 — inputmode=decimal 이고 maxlength 없는 것
             print("[9-6] 용량 입력 (50)")
             capacity_input = wait.until(EC.presence_of_element_located(
                 (By.CSS_SELECTOR,
@@ -354,13 +350,10 @@ def run_automation():
             human_delay(0.5, 1.0)
             human_type(capacity_input, "50")
             human_delay(1.0, 2.0)
-            driver.save_screenshot("step17_capacity_input.png")
 
-            # ✅ 사업자번호 — maxlength=12 로 구분
             print("[9-7] 사업자번호 입력")
             biz_num_input = wait.until(EC.presence_of_element_located(
-                (By.CSS_SELECTOR,
-                 "input[inputmode='decimal'][maxlength='12']")
+                (By.CSS_SELECTOR, "input[inputmode='decimal'][maxlength='12']")
             ))
             biz_num_input.click()
             human_delay(0.5, 1.0)
@@ -410,11 +403,27 @@ def run_automation():
                  "and normalize-space(text())='약관 확인하기']")
             ))
             click(driver, terms_btn)
-            human_delay(5, 7)
+            human_delay(3, 5)
             driver.save_screenshot("step22_after_terms.png")
             print(f"[9-11] 약관 확인하기 클릭 후 URL: {driver.current_url}")
 
-            print("[9-12] 전체 동의하기 버튼 클릭")
+            # ✅ 약관 아래 화살표(▼) 버튼 여러번 클릭해서 끝까지 스크롤
+            print("[9-12] 약관 아래 화살표 클릭 (끝까지 스크롤)")
+            for i in range(10):
+                try:
+                    down_btn = driver.find_element(
+                        By.XPATH,
+                        "//img[contains(@src,'iVBORw0KGgoAAAANSUhEUgAAACoAAAAY')]"
+                    )
+                    click(driver, down_btn)
+                    time.sleep(0.5)
+                except Exception:
+                    break
+            human_delay(2, 3)
+            driver.save_screenshot("step23_after_scroll.png")
+
+            # ✅ 전체 동의하기 버튼 클릭
+            print("[9-13] 전체 동의하기 버튼 클릭")
             agree_all_btn = wait.until(EC.presence_of_element_located(
                 (By.XPATH,
                  "//div[contains(@class,'button--label') "
@@ -424,7 +433,7 @@ def run_automation():
             click(driver, agree_all_btn)
             human_delay(8, 10)
             driver.save_screenshot("step24_after_agree_all.png")
-            print(f"[9-12] 전체 동의하기 클릭 후 URL: {driver.current_url}")
+            print(f"[9-13] 전체 동의하기 클릭 후 URL: {driver.current_url}")
 
             if "completed" in driver.current_url:
                 report_details.append("✅ 직접 신청하기 : 완료")
