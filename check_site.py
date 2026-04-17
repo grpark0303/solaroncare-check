@@ -407,20 +407,15 @@ def run_automation():
             driver.save_screenshot("step22_after_terms.png")
             print(f"[9-11] 약관 확인하기 클릭 후 URL: {driver.current_url}")
 
-            # ✅ 약관 아래 화살표(▼) 버튼 여러번 클릭해서 끝까지 스크롤
-            print("[9-12] 약관 아래 화살표 클릭 (끝까지 스크롤)")
-            for i in range(10):
-                try:
-                    down_btn = driver.find_element(
-                        By.XPATH,
-                        "//img[contains(@src,'iVBORw0KGgoAAAANSUhEUgAAACoAAAAY')]"
-                    )
-                    click(driver, down_btn)
-                    time.sleep(0.5)
-                except Exception:
-                    break
-            human_delay(2, 3)
-            driver.save_screenshot("step23_after_scroll.png")
+            # ✅ 아래 화살표 버튼 한 번 클릭 → 5초 대기
+            print("[9-12] 약관 아래 화살표 클릭")
+            down_btn = wait.until(EC.presence_of_element_located(
+                (By.CSS_SELECTOR, "div.down_btn")
+            ))
+            click(driver, down_btn)
+            print("[9-12] 아래 화살표 클릭 완료 → 5초 대기")
+            time.sleep(5)
+            driver.save_screenshot("step23_after_down_btn.png")
 
             # ✅ 전체 동의하기 버튼 클릭
             print("[9-13] 전체 동의하기 버튼 클릭")
