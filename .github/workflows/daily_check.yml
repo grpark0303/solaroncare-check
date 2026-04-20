@@ -1,7 +1,7 @@
 name: Daily Site Check
 on:
   schedule:
-    - cron: '0 22 * * 1-5'
+    - cron: '0 22 * * 0-4'
   workflow_dispatch:
 
 jobs:
