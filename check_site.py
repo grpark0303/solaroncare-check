@@ -303,16 +303,19 @@ def run_automation():
             human_delay(5, 7)
             print(f"[9-1] 직접 신청하기 클릭 후 URL: {driver.current_url}")
 
-            print("[9-2] 신규 발전소 서비스 신청하기 버튼 클릭")
-            new_plant_btn = wait.until(EC.presence_of_element_located(
-                (By.XPATH,
-                 "//div[contains(@class,'button--label') "
-                 "and contains(@class,'text-white') "
-                 "and contains(text(),'신규 발전소 서비스 신청하기')]")
-            ))
-            click(driver, new_plant_btn)
-            human_delay(3, 5)
-            print(f"[9-2] 신규 발전소 신청하기 클릭 후 URL: {driver.current_url}")
+            # ✅ 있으면 클릭, 없으면 스킵
+            try:
+                new_plant_btn = short_wait.until(EC.presence_of_element_located(
+                    (By.XPATH,
+                     "//div[contains(@class,'button--label') "
+                     "and contains(@class,'text-white') "
+                     "and contains(text(),'신규 발전소 서비스 신청하기')]")
+                ))
+                click(driver, new_plant_btn)
+                human_delay(3, 5)
+                print("[9-2] 신규 발전소 신청하기 클릭 완료")
+            except Exception:
+                print("[9-2] 신규 발전소 버튼 없음 → 스킵")
 
             print("[9-3] 발전소명 입력")
             plant_name_input = wait.until(EC.presence_of_element_located(
@@ -407,7 +410,6 @@ def run_automation():
             driver.save_screenshot("step22_after_terms.png")
             print(f"[9-11] 약관 확인하기 클릭 후 URL: {driver.current_url}")
 
-            # ✅ 아래 화살표 버튼 한 번 클릭 → 5초 대기
             print("[9-12] 약관 아래 화살표 클릭")
             down_btn = wait.until(EC.presence_of_element_located(
                 (By.CSS_SELECTOR, "div.down_btn")
@@ -417,7 +419,6 @@ def run_automation():
             time.sleep(5)
             driver.save_screenshot("step23_after_down_btn.png")
 
-            # ✅ 전체 동의하기 버튼 클릭
             print("[9-13] 전체 동의하기 버튼 클릭")
             agree_all_btn = wait.until(EC.presence_of_element_located(
                 (By.XPATH,
